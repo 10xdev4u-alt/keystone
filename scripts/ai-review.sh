@@ -55,28 +55,28 @@ call_model() {
     --arg user "${user}" \
     '{model: $model, messages: [{role: "system", content: $system}, {role: "user", content: $user}], temperature: 0.2, max_tokens: 2000}')"
 
-  raw=""
+  out=""
   for attempt in 1 2 3; do
     raw="$(curl -sS -m 240 --retry 2 --retry-delay 2 --retry-all-errors \
       -H 'Content-Type: application/json' -d "${payload}" "${ENDPOINT}" 2>/dev/null || true)"
-    if [ -n "${raw}" ]; then
+
+    # 2>/dev/null on printf silences "write error: Broken pipe" noise from
+    # pipefail when the downstream reader finishes early.
+    out="$(printf '%s' "${raw}" 2>/dev/null | jq -r '.choices[0].message.content // empty' 2>/dev/null || true)"
+    if [ -z "${out}" ]; then
+      out="$(printf '%s' "${raw}" 2>/dev/null \
+        | grep '^data: ' | sed 's/^data: //' | grep -v '^\[DONE\]$' \
+        | jq -r '.choices[0].delta.content // empty' 2>/dev/null | tr -d '\n' || true)"
+    fi
+    if [ -z "${out}" ]; then
+      out="$(printf '%s' "${raw}" 2>/dev/null | jq -r '.error.message // empty' 2>/dev/null || true)"
+    fi
+    if [ -n "${out}" ]; then
       break
     fi
-    echo "::warning::model call attempt ${attempt} returned nothing; retrying" >&2
+    echo "::warning::model call attempt ${attempt} yielded no content; retrying" >&2
     sleep 3
   done
-
-  # 2>/dev/null on printf silences "write error: Broken pipe" noise from
-  # pipefail when the downstream reader finishes early.
-  out="$(printf '%s' "${raw}" 2>/dev/null | jq -r '.choices[0].message.content // empty' 2>/dev/null || true)"
-  if [ -z "${out}" ]; then
-    out="$(printf '%s' "${raw}" 2>/dev/null \
-      | grep '^data: ' | sed 's/^data: //' | grep -v '^\[DONE\]$' \
-      | jq -r '.choices[0].delta.content // empty' 2>/dev/null | tr -d '\n' || true)"
-  fi
-  if [ -z "${out}" ]; then
-    out="$(printf '%s' "${raw}" 2>/dev/null | jq -r '.error.message // empty' 2>/dev/null || true)"
-  fi
   if [ -z "${out}" ]; then
     out="review failed: unparseable response from ${ENDPOINT}"
     echo "::warning::${out}" >&2
@@ -93,7 +93,12 @@ post_comment() {
   if command -v gh >/dev/null 2>&1 \
     && [ -n "${GITHUB_REPOSITORY:-}" ] \
     && [[ "${AI_REVIEW_PR:-}" =~ ^[0-9]+$ ]]; then
-    gh_out="$(gh pr comment "${AI_REVIEW_PR}" --repo "${GITHUB_REPOSITORY}" --body "${body}" 2>&1)" || {
+    # Use the REST issues endpoint directly: gh's GraphQL addComment
+    # mutation is unreliable for GITHUB_TOKEN ("Resource not accessible by
+    # integration (addComment)") even with issues: write granted.
+    gh_out="$(gh api --method POST \
+      "/repos/${GITHUB_REPOSITORY}/issues/${AI_REVIEW_PR}/comments" \
+      -f body="${body}" 2>&1)" || {
       # Never fail silently: a review tool that can't post must say so.
       echo "::error::failed to post PR comment: ${gh_out}" >&2
       printf '%s\n' "${body}" >&2
