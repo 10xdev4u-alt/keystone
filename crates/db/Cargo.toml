@@ -8,6 +8,10 @@ license.workspace = true
 [lints]
 workspace = true
 
+[features]
+# Integration-test helpers: connect to TEST_DATABASE_URL, migrate, truncate.
+test-util = []
+
 [dependencies]
 sqlx.workspace = true
 tokio.workspace = true

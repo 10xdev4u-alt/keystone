@@ -17,6 +17,20 @@ jobs:
     name: Format · Clippy · Build · Test
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: keystone
+          POSTGRES_PASSWORD: keystone_test
+          POSTGRES_DB: keystone_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U keystone"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -30,6 +44,10 @@ jobs:
       - name: Build
         run: cargo build --all-features
       - name: Test
+        # TEST_DATABASE_URL enables the integration suite (migration dry-run,
+        # repositories). Tests self-skip when it is unset.
+        env:
+          TEST_DATABASE_URL: postgres://keystone:keystone_test@localhost:5432/keystone_test
         run: cargo test --all-features
 
   audit:
