@@ -32,6 +32,9 @@ pub async fn ping(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query("SELECT 1").execute(pool).await.map(|_| ())
 }
 
+/// Typed repositories — the only place SQL lives.
+pub mod repositories;
+
 /// Integration-test helpers (feature-gated; never shipped).
 #[cfg(feature = "test-util")]
 pub mod test_util;
