@@ -43,9 +43,10 @@ jobs:
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
       - name: Audit dependencies
-        # Ignores are documented in audit.toml at the repo root; a bare cargo
-        # audit exits non-zero on any un-ignored vulnerability.
-        run: cargo audit
+        # Ignores are documented in .cargo/audit.toml; the config path is
+        # explicit so behavior never depends on cwd discovery. cargo audit
+        # exits non-zero on any un-ignored vulnerability.
+        run: cargo audit --config .cargo/audit.toml
 
   security-grep:
     name: Secrets-in-logs guard
