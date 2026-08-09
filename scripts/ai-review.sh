@@ -115,8 +115,12 @@ AUTHOR="$(command -v gh >/dev/null 2>&1 \
   && gh pr view "${AI_REVIEW_PR}" --repo "${GITHUB_REPOSITORY}" --json author -q '.author.login' 2>/dev/null || true)"
 AUTHOR="${AUTHOR:-${GITHUB_ACTOR:-the author}}"
 
-# ── Pass 1: structured review ────────────────────────────────────────────────
-STRUCTURED="$(call_model \
+# ── Both passes, run IN PARALLEL ─────────────────────────────────────────────
+# Two independent model calls; the slow endpoint makes sequential passes too
+# slow for fast-merged PRs. Temp files avoid command-substitution pipe noise.
+TMPDIR_REVIEW="$(mktemp -d)"
+
+call_model \
   "You are a terse, opinionated senior Rust engineer doing PR review. You never invent findings; when unsure, you say so. Findings must reference real file:line from the diff. If a section has no findings, write 'None.'" \
   "Review this pull-request diff. Output markdown with EXACTLY these sections:
 
@@ -142,23 +146,10 @@ If the diff is entirely clean, reply with exactly: No issues found.
 
 <diff>
 ${DIFF}
-</diff>")"
+</diff>" > "${TMPDIR_REVIEW}/structured.txt" &
+PID_STRUCTURED=$!
 
-STRUCTURED_BODY="## 🔍 AI Review — ${MODEL}
-
-${STRUCTURED}
-
----
-_Structured pass vs \`${BASE_REF}\` by \`scripts/ai-review.sh\`. Advisory only — non-blocking._"
-
-if [ -z "${STRUCTURED}" ] || [[ "${STRUCTURED}" == review\ failed:* ]]; then
-  echo "::warning::structured review unavailable (${STRUCTURED}) — skipping comment" >&2
-else
-  post_comment "${STRUCTURED_BODY}" && echo "posted structured review comment" || echo "structured comment fallback printed"
-fi
-
-# ── Pass 2: companion second opinion ─────────────────────────────────────────
-COMPANION="$(call_model \
+call_model \
   "You are an independent senior engineer giving a SECOND opinion on a pull request. You have not seen the first reviewer's notes. Be honest and direct — your value is disagreeing constructively and catching what a checklist review misses. Never invent findings." \
   "Read this diff as a peer, not a checklist. Give an honest second opinion:
 
@@ -172,8 +163,31 @@ Keep it under 250 words. Plain markdown, headers for each numbered part.
 
 <diff>
 ${DIFF}
-</diff>")"
+</diff>" > "${TMPDIR_REVIEW}/companion.txt" &
+PID_COMPANION=$!
 
+wait "${PID_STRUCTURED}" || true
+wait "${PID_COMPANION}" || true
+
+STRUCTURED="$(cat "${TMPDIR_REVIEW}/structured.txt" 2>/dev/null || true)"
+COMPANION="$(cat "${TMPDIR_REVIEW}/companion.txt" 2>/dev/null || true)"
+rm -rf "${TMPDIR_REVIEW}"
+
+# ── Post: structured review ──────────────────────────────────────────────────
+STRUCTURED_BODY="## 🔍 AI Review — ${MODEL}
+
+${STRUCTURED}
+
+---
+_Structured pass vs \`${BASE_REF}\` by \`scripts/ai-review.sh\`. Advisory only — non-blocking._"
+
+if [ -z "${STRUCTURED}" ] || [[ "${STRUCTURED}" == review\ failed:* ]]; then
+  echo "::warning::structured review unavailable (${STRUCTURED}) — skipping comment" >&2
+else
+  post_comment "${STRUCTURED_BODY}" && echo "posted structured review comment" || echo "structured comment fallback printed"
+fi
+
+# ── Post: companion second opinion ───────────────────────────────────────────
 COMPANION_BODY="## 🧠 Companion Second Opinion
 
 Hey @${AUTHOR} — here's an honest, independent take on this PR:
