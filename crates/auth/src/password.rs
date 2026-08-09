@@ -4,7 +4,6 @@
 //! so hashes are self-describing and portable. Verification is constant-time
 //! with respect to the password via the underlying implementation.
 
-use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::{PasswordHash, PasswordHasher as _, PasswordVerifier as _, SaltString};
 use argon2::{Algorithm, Argon2, Params, Version};
 use keystone_config::Argon2Config;
@@ -49,11 +48,15 @@ impl PasswordHasher {
         Ok(Self { params })
     }
 
-    /// Hash a password into a PHC string. The salt is fresh random per call.
+    /// Hash a password into a PHC string. The salt is fresh random per call,
+    /// drawn straight from the OS RNG (getrandom) — no RNG feature juggling.
     pub fn hash(&self, password: &str) -> Result<String, PasswordError> {
         validate(password)?;
+        let mut salt_bytes = [0u8; 16];
+        getrandom::fill(&mut salt_bytes).map_err(|e| PasswordError::Hash(e.to_string()))?;
+        let salt =
+            SaltString::encode_b64(&salt_bytes).map_err(|e| PasswordError::Hash(e.to_string()))?;
         let argon2 = self.argon2();
-        let salt = SaltString::generate(&mut OsRng);
         let hash = argon2
             .hash_password(password.as_bytes(), &salt)
             .map_err(|e| PasswordError::Hash(e.to_string()))?;

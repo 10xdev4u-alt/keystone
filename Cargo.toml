@@ -24,6 +24,9 @@ base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 jwt-compact = "0.8"
 zeroize = "1"
+getrandom = "0.3"
+hex = "0.4"
+sha2 = "0.10"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
