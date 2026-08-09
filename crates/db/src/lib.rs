@@ -31,3 +31,7 @@ pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
 pub async fn ping(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query("SELECT 1").execute(pool).await.map(|_| ())
 }
+
+/// Integration-test helpers (feature-gated; never shipped).
+#[cfg(feature = "test-util")]
+pub mod test_util;
