@@ -1,0 +1,15 @@
+# cargo-audit configuration.
+#
+# Every ignored advisory MUST carry a rationale that is still true at review
+# time. Re-run `cargo audit` after any dependency change; if an ignore no
+# longer applies, remove it.
+
+[advisories]
+ignore = [
+    # RUSTSEC-2023-0071 — Marvin Attack: timing side channel in `rsa` 0.9.10.
+    # Reachable in this lockfile ONLY through `sqlx-mysql` (the MySQL driver),
+    # which is never compiled here: sqlx is used with the `postgres` feature
+    # only. `cargo tree -i rsa` on the default target prints nothing.
+    # No patched release exists yet. Revisit if the MySQL driver is enabled.
+    "RUSTSEC-2023-0071",
+]
