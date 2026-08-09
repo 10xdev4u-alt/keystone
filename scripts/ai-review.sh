@@ -86,16 +86,20 @@ call_model() {
 
 post_comment() {
   local body="$1"
+  local gh_out
   # CI checks out in detached HEAD, so gh cannot infer the PR from the branch
-  # — the workflow passes the PR number explicitly via AI_REVIEW_PR.
+  # — the workflow passes the PR number explicitly via AI_REVIEW_PR. That
+  # value must be numeric to guard against argument injection.
   if command -v gh >/dev/null 2>&1 \
     && [ -n "${GITHUB_REPOSITORY:-}" ] \
-    && [ -n "${AI_REVIEW_PR:-}" ]; then
-    if gh pr comment "${AI_REVIEW_PR}" --repo "${GITHUB_REPOSITORY}" --body "${body}" >/dev/null 2>&1; then
-      return 0
-    fi
-    printf '%s\n' "${body}" >&2
-    return 1
+    && [[ "${AI_REVIEW_PR:-}" =~ ^[0-9]+$ ]]; then
+    gh_out="$(gh pr comment "${AI_REVIEW_PR}" --repo "${GITHUB_REPOSITORY}" --body "${body}" 2>&1)" || {
+      # Never fail silently: a review tool that can't post must say so.
+      echo "::error::failed to post PR comment: ${gh_out}" >&2
+      printf '%s\n' "${body}" >&2
+      return 1
+    }
+    return 0
   fi
   printf '%s\n' "${body}"
 }
