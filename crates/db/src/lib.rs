@@ -10,10 +10,14 @@ use sqlx::PgPool;
 use std::time::Duration;
 
 /// Open a PostgreSQL connection pool with sane defaults.
-pub async fn connect(database_url: &str, max_connections: u32) -> Result<PgPool, sqlx::Error> {
+pub async fn connect(
+    database_url: &str,
+    max_connections: u32,
+    acquire_timeout: Duration,
+) -> Result<PgPool, sqlx::Error> {
     PgPoolOptions::new()
         .max_connections(max_connections.max(1))
-        .acquire_timeout(Duration::from_secs(30))
+        .acquire_timeout(acquire_timeout)
         .connect(database_url)
         .await
 }

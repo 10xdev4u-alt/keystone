@@ -1,7 +1,8 @@
-//! keystone API binary entrypoint.
+//! Keystone API binary entrypoint.
 #![forbid(unsafe_code)]
 
-use keystone_api::{router, AppState};
+use keystone_api::{cors_layer, router, AppState};
+use keystone_config::Config;
 use std::time::Instant;
 use tracing_subscriber::EnvFilter;
 
@@ -10,49 +11,40 @@ async fn main() -> anyhow::Result<()> {
     // Load `.env` if present; real secrets are injected by the environment.
     dotenvy::dotenv().ok();
 
+    let config = Config::from_env()?;
+
     tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info,keystone=debug")),
-        )
+        .with_env_filter(EnvFilter::new(&config.log.filter))
         .init();
 
-    let database_url = env("DATABASE_URL");
-    let max_connections: u32 = env_parse("DATABASE_MAX_CONNECTIONS").unwrap_or(10);
-    let host = env_default("HOST", "0.0.0.0");
-    let port = env_default("PORT", "4000");
-
-    let pool = keystone_db::connect(&database_url, max_connections).await?;
+    let pool = keystone_db::connect(
+        &config.database.url,
+        config.database.max_connections,
+        config.database.connect_timeout,
+    )
+    .await?;
     keystone_db::migrate(&pool).await?;
     tracing::info!("database connected and migrated");
 
-    let addr = format!("{host}:{port}");
+    let state = AppState {
+        pool,
+        started_at: Instant::now(),
+    };
+    let mut app = router(state);
+    if !config.app.cors_origins.is_empty() {
+        app = app.layer(cors_layer(&config.app.cors_origins));
+        tracing::info!(origins = ?config.app.cors_origins, "CORS enabled");
+    }
+
+    let addr = format!("{}:{}", config.server.host, config.server.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     tracing::info!("listening on {addr}");
 
-    axum::serve(
-        listener,
-        router(AppState {
-            pool,
-            started_at: Instant::now(),
-        }),
-    )
-    .with_graceful_shutdown(shutdown_signal())
-    .await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
     Ok(())
-}
-
-fn env(key: &str) -> String {
-    std::env::var(key).unwrap_or_else(|_| panic!("required environment variable {key} is not set"))
-}
-
-fn env_default(key: &str, default: &str) -> String {
-    std::env::var(key).unwrap_or_else(|_| default.to_owned())
-}
-
-fn env_parse<T: std::str::FromStr>(key: &str) -> Option<T> {
-    std::env::var(key).ok().and_then(|v| v.parse().ok())
 }
 
 async fn shutdown_signal() {

@@ -35,12 +35,17 @@ jobs:
   audit:
     name: Dependency audit
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Audit dependencies
+        # Ignores are documented in audit.toml at the repo root; a bare cargo
+        # audit exits non-zero on any un-ignored vulnerability.
+        run: cargo audit
 
   security-grep:
     name: Secrets-in-logs guard

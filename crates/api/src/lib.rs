@@ -1,19 +1,26 @@
-//! HTTP API crate for keystone (Axum).
+//! HTTP API crate for Keystone (Axum).
 //!
 //! Health endpoints follow the split convention:
 //!   GET /healthz      — process liveness (no dependencies)
 //!   GET /readyz       — readiness (database reachable, migrations applied)
 //!   GET /api/v1/health — application health JSON
+//!
+//! Errors are RFC 7807 problem+json (see `error` module).
 #![forbid(unsafe_code)]
 
+pub mod error;
+
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::header::{self, HeaderName, HeaderValue};
+use axum::http::{Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
+use error::ApiError;
 use serde_json::json;
 use sqlx::PgPool;
 use std::time::Instant;
+use tower_http::cors::CorsLayer;
 
 /// Shared application state.
 #[derive(Clone)]
@@ -28,7 +35,34 @@ pub fn router(state: AppState) -> Router {
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
         .route("/api/v1/health", get(api_health))
+        .fallback(not_found)
         .with_state(state)
+}
+
+/// CORS layer restricted to the configured origins.
+///
+/// When `origins` is empty the layer is not applied at all — same-origin /
+/// reverse-proxy only, which is the secure default for local development.
+pub fn cors_layer(origins: &[String]) -> CorsLayer {
+    let allowed: Vec<HeaderValue> = origins.iter().filter_map(|o| o.parse().ok()).collect();
+    CorsLayer::new()
+        .allow_origin(allowed)
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::PATCH,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
+        .allow_headers([
+            header::CONTENT_TYPE,
+            header::AUTHORIZATION,
+            header::ACCEPT,
+            HeaderName::from_static("x-request-id"),
+            HeaderName::from_static("x-csrf-token"),
+        ])
+        .allow_credentials(true)
 }
 
 async fn healthz() -> &'static str {
@@ -51,6 +85,10 @@ async fn api_health(State(state): State<AppState>) -> Json<serde_json::Value> {
     }))
 }
 
+async fn not_found() -> ApiError {
+    ApiError::NotFound
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -60,18 +98,20 @@ mod tests {
     use sqlx::postgres::PgPoolOptions;
     use tower::ServiceExt;
 
-    #[tokio::test]
-    async fn healthz_answers_without_a_database() {
+    fn lazy_app() -> Router {
         // connect_lazy never opens a socket, so this works with no DB running.
         let pool = PgPoolOptions::new()
             .connect_lazy("postgres://keystone:keystone@localhost:5432/keystone")
             .expect("lazy pool must not require a live database");
-        let app = router(AppState {
+        router(AppState {
             pool,
             started_at: Instant::now(),
-        });
+        })
+    }
 
-        let response = app
+    #[tokio::test]
+    async fn healthz_answers_without_a_database() {
+        let response = lazy_app()
             .oneshot(
                 Request::builder()
                     .uri("/healthz")
@@ -89,5 +129,36 @@ mod tests {
             .expect("body must read")
             .to_bytes();
         assert_eq!(&body[..], b"ok");
+    }
+
+    #[tokio::test]
+    async fn unknown_route_returns_problem_json() {
+        let response = lazy_app()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/does-not-exist")
+                    .body(Body::empty())
+                    .expect("request must build"),
+            )
+            .await
+            .expect("handler must not panic");
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response
+                .headers()
+                .get(header::CONTENT_TYPE)
+                .map(|v| v.as_bytes()),
+            Some(b"application/json".as_slice())
+        );
+        let body = response
+            .into_body()
+            .collect()
+            .await
+            .expect("body must read")
+            .to_bytes();
+        let value: serde_json::Value = serde_json::from_slice(&body).expect("body must be JSON");
+        assert_eq!(value["code"], "not_found");
+        assert_eq!(value["status"], 404);
     }
 }
