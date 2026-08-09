@@ -30,6 +30,8 @@ jobs:
         run: git fetch origin "${GITHUB_BASE_REF:-main}" --quiet || true
       - name: Run AI review
         env:
+          # gh refuses to run without an explicit token in Actions workflows.
+          GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           AI_REVIEW_PR: ${{ github.event.pull_request.number }}
           AI_REVIEW_ENDPOINT: ${{ vars.AI_REVIEW_ENDPOINT }}

@@ -91,7 +91,7 @@ post_comment() {
   # — the workflow passes the PR number explicitly via AI_REVIEW_PR. That
   # value must be numeric to guard against argument injection.
   if command -v gh >/dev/null 2>&1 \
-    && [ -n "${GITHUB_REPOSITORY:-}" ] \
+    && [[ "${GITHUB_REPOSITORY:-}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] \
     && [[ "${AI_REVIEW_PR:-}" =~ ^[0-9]+$ ]]; then
     gh_out="$(gh pr comment "${AI_REVIEW_PR}" --repo "${GITHUB_REPOSITORY}" --body "${body}" 2>&1)" || {
       # Never fail silently: a review tool that can't post must say so.
