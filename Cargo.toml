@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/api", "crates/config", "crates/db", "crates/domain"]
+members = ["crates/api", "crates/auth", "crates/config", "crates/db", "crates/domain"]
 
 [workspace.package]
 version = "0.1.0"
@@ -19,6 +19,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dotenvy = "0.15"
 thiserror = "2"
 anyhow = "1"
+argon2 = "0.5"
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+jwt-compact = "0.8"
+zeroize = "1"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

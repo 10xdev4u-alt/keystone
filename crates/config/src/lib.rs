@@ -21,6 +21,37 @@ pub struct Config {
     pub database: DatabaseConfig,
     pub app: AppConfig,
     pub log: LogConfig,
+    pub auth: AuthConfig,
+}
+
+/// Identity & session configuration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthConfig {
+    pub argon2: Argon2Config,
+    pub jwt: JwtConfig,
+}
+
+/// Argon2id password-hashing parameters (OWASP-aligned defaults).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Argon2Config {
+    pub memory_kib: u32,
+    pub iterations: u32,
+    pub parallelism: u32,
+}
+
+/// JWT signing/verification configuration.
+///
+/// v1 signs with HS256: `private_key_b64`/`private_key_path` carry the shared
+/// secret (base64 wins over file path). When an asymmetric upgrade lands, the
+/// public key pair is added here without renaming these fields.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JwtConfig {
+    pub issuer: String,
+    pub audience: String,
+    pub access_expiration_secs: i64,
+    pub refresh_expiration_secs: i64,
+    pub private_key_b64: Option<String>,
+    pub private_key_path: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,6 +122,22 @@ impl Config {
 
         let log_filter = get("RUST_LOG").unwrap_or_else(|| "info,keystone=debug".into());
 
+        let auth = AuthConfig {
+            argon2: Argon2Config {
+                memory_kib: parse_u32(source, "ARGON2_MEMORY", 19_456)?,
+                iterations: parse_u32(source, "ARGON2_ITERATIONS", 2)?,
+                parallelism: parse_u32(source, "ARGON2_PARALLELISM", 1)?,
+            },
+            jwt: JwtConfig {
+                issuer: get("JWT_ISSUER").unwrap_or_else(|| "keystone".into()),
+                audience: get("JWT_AUDIENCE").unwrap_or_else(|| "keystone-api".into()),
+                access_expiration_secs: parse_i64(source, "JWT_ACCESS_EXPIRATION", 900)?,
+                refresh_expiration_secs: parse_i64(source, "JWT_REFRESH_EXPIRATION", 604_800)?,
+                private_key_b64: get("JWT_PRIVATE_KEY_B64").filter(|v| !v.is_empty()),
+                private_key_path: get("JWT_PRIVATE_KEY_PATH").filter(|v| !v.is_empty()),
+            },
+        };
+
         Ok(Config {
             server: ServerConfig { host, port },
             database: DatabaseConfig {
@@ -104,6 +151,7 @@ impl Config {
                 cors_origins,
             },
             log: LogConfig { filter: log_filter },
+            auth,
         })
     }
 }
@@ -147,6 +195,20 @@ fn parse_u64(
     match source.get(key) {
         None => Ok(default),
         Some(raw) => raw.parse::<u64>().map_err(|_| ConfigError::Invalid {
+            key: key.into(),
+            message: format!("expected an integer, got {raw:?}"),
+        }),
+    }
+}
+
+fn parse_i64(
+    source: &HashMap<String, String>,
+    key: &str,
+    default: i64,
+) -> Result<i64, ConfigError> {
+    match source.get(key) {
+        None => Ok(default),
+        Some(raw) => raw.parse::<i64>().map_err(|_| ConfigError::Invalid {
             key: key.into(),
             message: format!("expected an integer, got {raw:?}"),
         }),
@@ -212,5 +274,55 @@ mod tests {
         let err = Config::from_source(&env(&[("DATABASE_URL", "x"), ("PORT", "not-a-port")]))
             .unwrap_err();
         assert!(err.to_string().contains("PORT"));
+    }
+
+    #[test]
+    fn auth_defaults_apply_when_unset() {
+        let cfg =
+            Config::from_source(&env(&[("DATABASE_URL", "postgres://localhost/db")])).unwrap();
+        assert_eq!(cfg.auth.argon2.memory_kib, 19_456);
+        assert_eq!(cfg.auth.argon2.iterations, 2);
+        assert_eq!(cfg.auth.argon2.parallelism, 1);
+        assert_eq!(cfg.auth.jwt.issuer, "keystone");
+        assert_eq!(cfg.auth.jwt.audience, "keystone-api");
+        assert_eq!(cfg.auth.jwt.access_expiration_secs, 900);
+        assert_eq!(cfg.auth.jwt.refresh_expiration_secs, 604_800);
+        assert_eq!(cfg.auth.jwt.private_key_b64, None);
+        assert_eq!(cfg.auth.jwt.private_key_path, None);
+    }
+
+    #[test]
+    fn auth_values_are_parsed() {
+        let cfg = Config::from_source(&env(&[
+            ("DATABASE_URL", "postgres://localhost/db"),
+            ("ARGON2_MEMORY", "65536"),
+            ("ARGON2_ITERATIONS", "3"),
+            ("ARGON2_PARALLELISM", "4"),
+            ("JWT_ISSUER", "keystone-prod"),
+            ("JWT_AUDIENCE", "keystone-api-prod"),
+            ("JWT_ACCESS_EXPIRATION", "600"),
+            ("JWT_REFRESH_EXPIRATION", "1209600"),
+            ("JWT_PRIVATE_KEY_B64", "c2VjcmV0"),
+            ("JWT_PRIVATE_KEY_PATH", "./keys/private.pem"),
+        ]))
+        .unwrap();
+        assert_eq!(cfg.auth.argon2.memory_kib, 65_536);
+        assert_eq!(cfg.auth.jwt.issuer, "keystone-prod");
+        assert_eq!(cfg.auth.jwt.access_expiration_secs, 600);
+        assert_eq!(cfg.auth.jwt.private_key_b64.as_deref(), Some("c2VjcmV0"));
+        assert_eq!(
+            cfg.auth.jwt.private_key_path.as_deref(),
+            Some("./keys/private.pem")
+        );
+    }
+
+    #[test]
+    fn invalid_expiration_is_rejected() {
+        let err = Config::from_source(&env(&[
+            ("DATABASE_URL", "x"),
+            ("JWT_ACCESS_EXPIRATION", "soon"),
+        ]))
+        .unwrap_err();
+        assert!(err.to_string().contains("JWT_ACCESS_EXPIRATION"));
     }
 }
