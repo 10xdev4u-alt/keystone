@@ -37,6 +37,11 @@ fi
 
 # Single model call; returns the assistant's text. Handles both the plain
 # OpenAI shape and the SSE-chunked stream this endpoint emits by default.
+#
+# The endpoint intermittently closes the connection mid-stream (curl exit 18
+# "partial file"), sometimes after delivering the whole body. We retry with
+# --retry-all-errors and keep whatever the last attempt delivered — jq can
+# still parse a complete payload even when curl reports a partial transfer.
 call_model() {
   local system="$1"
   local user="$2"
@@ -48,7 +53,16 @@ call_model() {
     --arg user "${user}" \
     '{model: $model, messages: [{role: "system", content: $system}, {role: "user", content: $user}], temperature: 0.2, max_tokens: 2000}')"
 
-  raw="$(curl -sS -m 240 -H 'Content-Type: application/json' -d "${payload}" "${ENDPOINT}")"
+  raw=""
+  for attempt in 1 2 3; do
+    raw="$(curl -sS -m 240 --retry 2 --retry-delay 2 --retry-all-errors \
+      -H 'Content-Type: application/json' -d "${payload}" "${ENDPOINT}" 2>/dev/null || true)"
+    if [ -n "${raw}" ]; then
+      break
+    fi
+    echo "::warning::model call attempt ${attempt} returned nothing; retrying" >&2
+    sleep 3
+  done
 
   out="$(printf '%s' "${raw}" | jq -r '.choices[0].message.content // empty' 2>/dev/null || true)"
   if [ -z "${out}" ]; then
@@ -118,7 +132,11 @@ ${STRUCTURED}
 ---
 _Structured pass vs \`${BASE_REF}\` by \`scripts/ai-review.sh\`. Advisory only — non-blocking._"
 
-post_comment "${STRUCTURED_BODY}" && echo "posted structured review comment" || echo "structured comment fallback printed"
+if [ -z "${STRUCTURED}" ] || [[ "${STRUCTURED}" == review\ failed:* ]]; then
+  echo "::warning::structured review unavailable (${STRUCTURED}) — skipping comment" >&2
+else
+  post_comment "${STRUCTURED_BODY}" && echo "posted structured review comment" || echo "structured comment fallback printed"
+fi
 
 # ── Pass 2: companion second opinion ─────────────────────────────────────────
 COMPANION="$(call_model \
@@ -148,4 +166,8 @@ ${COMPANION}
 
 _Second pass vs \`${BASE_REF}\` by \`scripts/ai-review.sh\`. Advisory only — non-blocking._"
 
-post_comment "${COMPANION_BODY}" && echo "posted companion comment" || echo "companion comment fallback printed"
+if [ -z "${COMPANION}" ] || [[ "${COMPANION}" == review\ failed:* ]]; then
+  echo "::warning::companion review unavailable (${COMPANION}) — skipping comment" >&2
+else
+  post_comment "${COMPANION_BODY}" && echo "posted companion comment" || echo "companion comment fallback printed"
+fi
