@@ -170,7 +170,7 @@ impl Sessions {
     }
 
     /// Find ANY session (revoked or not) by hash — for reuse detection lookups.
-    async fn find_any_by_hash(&self, hash: &str) -> Result<Option<Session>, RepoError> {
+    pub async fn find_any_by_hash(&self, hash: &str) -> Result<Option<Session>, RepoError> {
         let row = sqlx::query_as::<_, Session>(
             r#"
             SELECT id, user_id, refresh_token_hash, user_agent, ip_address,

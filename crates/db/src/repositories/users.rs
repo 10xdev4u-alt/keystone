@@ -152,4 +152,20 @@ impl Users {
             .await?;
         Ok(())
     }
+
+    /// Time of the most recent failed login (feeds lockout backoff).
+    pub async fn last_failure_at(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Option<chrono::DateTime<chrono::Utc>>, RepoError> {
+        let last: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
+            r#"
+            SELECT max(attempted_at) FROM failed_logins WHERE user_id = $1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(last)
+    }
 }

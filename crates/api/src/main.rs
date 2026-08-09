@@ -26,9 +26,34 @@ async fn main() -> anyhow::Result<()> {
     keystone_db::migrate(&pool).await?;
     tracing::info!("database connected and migrated");
 
+    // Fail-fast auth construction: no JWT key, no boot. Keys load once here.
+    let jwt_keys = keystone_auth::jwt::JwtKeys::from_config(&config.auth.jwt)
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let jwt = keystone_auth::jwt::AccessTokenService::new(&config.auth.jwt, jwt_keys);
+    let password = keystone_auth::password::PasswordHasher::from_config(&config.auth.argon2)
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let lockout = keystone_auth::service::LockoutPolicy::new(
+        5,
+        std::time::Duration::from_secs(300),
+        std::time::Duration::from_secs(60),
+    );
+    let auth = keystone_api::auth::AuthServices {
+        password: std::sync::Arc::new(password),
+        jwt: std::sync::Arc::new(jwt),
+        lockout,
+        access_ttl: std::time::Duration::from_secs(
+            config.auth.jwt.access_expiration_secs.max(1) as u64
+        ),
+        refresh_ttl: std::time::Duration::from_secs(
+            config.auth.jwt.refresh_expiration_secs.max(1) as u64
+        ),
+        secure_cookies: config.app.app_url.starts_with("https://"),
+    };
+
     let state = AppState {
         pool,
         started_at: Instant::now(),
+        auth,
     };
     let mut app = router(state);
     if !config.app.cors_origins.is_empty() {
