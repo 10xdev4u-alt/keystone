@@ -1,0 +1,37 @@
+name: AI Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ai-review-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ai-review:
+    name: AI code review (qwen)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Advisory only: a review failure must never block a merge.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch base branch
+        run: git fetch origin "${GITHUB_BASE_REF:-main}" --quiet || true
+      - name: Run AI review
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          AI_REVIEW_ENDPOINT: ${{ vars.AI_REVIEW_ENDPOINT }}
+          AI_REVIEW_MODEL: ${{ vars.AI_REVIEW_MODEL }}
+          AI_REVIEW_MAX_BYTES: ${{ vars.AI_REVIEW_MAX_BYTES }}
+        run: |
+          BASE="origin/${GITHUB_BASE_REF:-main}"
+          bash scripts/ai-review.sh "${BASE}"
