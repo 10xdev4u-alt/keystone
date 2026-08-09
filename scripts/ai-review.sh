@@ -15,6 +15,8 @@
 #   AI_REVIEW_ENDPOINT   default https://qwen2api-n.smanx.xx.kg/v1/chat/completions
 #   AI_REVIEW_MODEL      default qwen3.8-max
 #   AI_REVIEW_MAX_BYTES  default 60000 (diff truncation)
+#   AI_REVIEW_PR         PR number to comment on (required in CI; the checkout
+#                        is detached HEAD so gh cannot infer the PR itself)
 #
 # NOTE: the diff is sent to an external endpoint. Only run this on code you are
 # willing to share with that service.
@@ -64,14 +66,16 @@ call_model() {
     sleep 3
   done
 
-  out="$(printf '%s' "${raw}" | jq -r '.choices[0].message.content // empty' 2>/dev/null || true)"
+  # 2>/dev/null on printf silences "write error: Broken pipe" noise from
+  # pipefail when the downstream reader finishes early.
+  out="$(printf '%s' "${raw}" 2>/dev/null | jq -r '.choices[0].message.content // empty' 2>/dev/null || true)"
   if [ -z "${out}" ]; then
-    out="$(printf '%s' "${raw}" \
+    out="$(printf '%s' "${raw}" 2>/dev/null \
       | grep '^data: ' | sed 's/^data: //' | grep -v '^\[DONE\]$' \
       | jq -r '.choices[0].delta.content // empty' 2>/dev/null | tr -d '\n' || true)"
   fi
   if [ -z "${out}" ]; then
-    out="$(printf '%s' "${raw}" | jq -r '.error.message // empty' 2>/dev/null || true)"
+    out="$(printf '%s' "${raw}" 2>/dev/null | jq -r '.error.message // empty' 2>/dev/null || true)"
   fi
   if [ -z "${out}" ]; then
     out="review failed: unparseable response from ${ENDPOINT}"
@@ -82,18 +86,28 @@ call_model() {
 
 post_comment() {
   local body="$1"
-  if command -v gh >/dev/null 2>&1 && [ -n "${GITHUB_REPOSITORY:-}" ]; then
-    if gh pr comment --repo "${GITHUB_REPOSITORY}" --body "${body}" >/dev/null 2>&1; then
-      return 0
-    fi
-    printf '%s\n' "${body}" >&2
-    return 1
+  local gh_out
+  # CI checks out in detached HEAD, so gh cannot infer the PR from the branch
+  # — the workflow passes the PR number explicitly via AI_REVIEW_PR. That
+  # value must be numeric to guard against argument injection.
+  if command -v gh >/dev/null 2>&1 \
+    && [ -n "${GITHUB_REPOSITORY:-}" ] \
+    && [[ "${AI_REVIEW_PR:-}" =~ ^[0-9]+$ ]]; then
+    gh_out="$(gh pr comment "${AI_REVIEW_PR}" --repo "${GITHUB_REPOSITORY}" --body "${body}" 2>&1)" || {
+      # Never fail silently: a review tool that can't post must say so.
+      echo "::error::failed to post PR comment: ${gh_out}" >&2
+      printf '%s\n' "${body}" >&2
+      return 1
+    }
+    return 0
   fi
   printf '%s\n' "${body}"
 }
 
-AUTHOR="$(command -v gh >/dev/null 2>&1 && [ -n "${GITHUB_REPOSITORY:-}" ] \
-  && gh pr view --repo "${GITHUB_REPOSITORY}" --json author -q '.author.login' 2>/dev/null || true)"
+AUTHOR="$(command -v gh >/dev/null 2>&1 \
+  && [ -n "${GITHUB_REPOSITORY:-}" ] \
+  && [ -n "${AI_REVIEW_PR:-}" ] \
+  && gh pr view "${AI_REVIEW_PR}" --repo "${GITHUB_REPOSITORY}" --json author -q '.author.login' 2>/dev/null || true)"
 AUTHOR="${AUTHOR:-${GITHUB_ACTOR:-the author}}"
 
 # ── Pass 1: structured review ────────────────────────────────────────────────
