@@ -28,6 +28,14 @@ MODEL="${AI_REVIEW_MODEL:-qwen3.8-max}"
 MAX_BYTES="${AI_REVIEW_MAX_BYTES:-60000}"
 
 DIFF="$(git diff "${BASE_REF}...HEAD" -- . ':(exclude)Cargo.lock' 2>/dev/null || true)"
+# Manual re-runs (workflow_dispatch with a pr_number) check out a branch whose
+# tree may equal main — fall back to the PR's own diff so the review still runs.
+if [ -z "${DIFF}" ] && [ -n "${AI_REVIEW_PR:-}" ] && command -v gh >/dev/null 2>&1; then
+  echo "::warning::git diff empty; fetching diff for PR #${AI_REVIEW_PR}" >&2
+  DIFF="$(gh pr diff "${AI_REVIEW_PR}" --repo "${GITHUB_REPOSITORY}" 2>/dev/null || true)"
+  # Drop Cargo.lock noise the same way the git path does.
+  DIFF="$(printf '%s\n' "${DIFF}" | awk '/^diff --git a\/Cargo.lock/{skip=1} skip && /^diff --git/{skip=0} !skip')"
+fi
 if [ -z "${DIFF}" ]; then
   echo "no diff to review against ${BASE_REF}; skipping"
   exit 0
