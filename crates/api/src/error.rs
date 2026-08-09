@@ -26,6 +26,8 @@ pub enum ApiError {
     BadRequest(String),
     #[error("unauthorized")]
     Unauthorized,
+    #[error("refresh token was reused; session family revoked")]
+    ReuseDetected,
     #[error("forbidden")]
     Forbidden,
     #[error("conflict: {0}")]
@@ -43,7 +45,7 @@ impl ApiError {
         match self {
             ApiError::NotFound => StatusCode::NOT_FOUND,
             ApiError::BadRequest(_) => StatusCode::BAD_REQUEST,
-            ApiError::Unauthorized => StatusCode::UNAUTHORIZED,
+            ApiError::Unauthorized | ApiError::ReuseDetected => StatusCode::UNAUTHORIZED,
             ApiError::Forbidden => StatusCode::FORBIDDEN,
             ApiError::Conflict(_) => StatusCode::CONFLICT,
             ApiError::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
@@ -56,6 +58,7 @@ impl ApiError {
             ApiError::NotFound => "not_found",
             ApiError::BadRequest(_) => "bad_request",
             ApiError::Unauthorized => "unauthorized",
+            ApiError::ReuseDetected => "token_reuse_detected",
             ApiError::Forbidden => "forbidden",
             ApiError::Conflict(_) => "conflict",
             ApiError::TooManyRequests => "too_many_requests",
@@ -68,6 +71,7 @@ impl ApiError {
             ApiError::NotFound => "Resource not found",
             ApiError::BadRequest(_) => "Bad request",
             ApiError::Unauthorized => "Unauthorized",
+            ApiError::ReuseDetected => "Token reuse detected",
             ApiError::Forbidden => "Forbidden",
             ApiError::Conflict(_) => "Conflict",
             ApiError::TooManyRequests => "Too many requests",

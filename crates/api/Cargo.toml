@@ -9,10 +9,12 @@ license.workspace = true
 workspace = true
 
 [dependencies]
+keystone-auth = { path = "../auth" }
 keystone-config = { path = "../config" }
 keystone-db = { path = "../db" }
 keystone-domain = { path = "../domain" }
 axum.workspace = true
+chrono.workspace = true
 tokio.workspace = true
 sqlx.workspace = true
 serde.workspace = true
@@ -20,10 +22,12 @@ serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 tower-http = { version = "0.6", features = ["cors"] }
+uuid.workspace = true
 dotenvy.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+keystone-db = { path = "../db", features = ["test-util"] }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"

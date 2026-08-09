@@ -8,13 +8,14 @@
 //! Errors are RFC 7807 problem+json (see `error` module).
 #![forbid(unsafe_code)]
 
+pub mod auth;
 pub mod error;
 
 use axum::extract::State;
 use axum::http::header::{self, HeaderName, HeaderValue};
 use axum::http::{Method, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use error::ApiError;
 use serde_json::json;
@@ -27,6 +28,7 @@ use tower_http::cors::CorsLayer;
 pub struct AppState {
     pub pool: PgPool,
     pub started_at: Instant,
+    pub auth: auth::AuthServices,
 }
 
 /// Build the API router with the given state.
@@ -35,6 +37,12 @@ pub fn router(state: AppState) -> Router {
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
         .route("/api/v1/health", get(api_health))
+        .route("/api/v1/auth/register", post(auth::register))
+        .route("/api/v1/auth/verify-email", post(auth::verify_email))
+        .route("/api/v1/auth/login", post(auth::login))
+        .route("/api/v1/auth/refresh", post(auth::refresh))
+        .route("/api/v1/auth/logout", post(auth::logout))
+        .route("/api/v1/auth/me", get(auth::me))
         .fallback(not_found)
         .with_state(state)
 }
@@ -106,6 +114,40 @@ mod tests {
         router(AppState {
             pool,
             started_at: Instant::now(),
+            auth: crate::auth::AuthServices {
+                password: std::sync::Arc::new(
+                    keystone_auth::password::PasswordHasher::from_config(
+                        &keystone_config::Argon2Config {
+                            memory_kib: 19_456,
+                            iterations: 2,
+                            parallelism: 1,
+                        },
+                    )
+                    .expect("params must be valid"),
+                ),
+                jwt: std::sync::Arc::new(keystone_auth::jwt::AccessTokenService::new(
+                    &keystone_config::JwtConfig {
+                        issuer: "keystone-test".into(),
+                        audience: "keystone-api".into(),
+                        access_expiration_secs: 900,
+                        refresh_expiration_secs: 604_800,
+                        private_key_b64: Some(
+                            "c2VjcmV0LXNlY3JldC1zZWNyZXQtc2VjcmV0LXNlY3JldC0xMjM0NTY3ODkw".into(),
+                        ),
+                        private_key_path: None,
+                    },
+                    keystone_auth::jwt::JwtKeys::from_secret(b"01234567890123456789012345678901")
+                        .expect("key must be valid"),
+                )),
+                lockout: keystone_auth::service::LockoutPolicy::new(
+                    5,
+                    std::time::Duration::from_secs(300),
+                    std::time::Duration::from_secs(60),
+                ),
+                access_ttl: std::time::Duration::from_secs(900),
+                refresh_ttl: std::time::Duration::from_secs(604_800),
+                secure_cookies: false,
+            },
         })
     }
 
