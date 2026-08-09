@@ -152,12 +152,10 @@ impl Sessions {
     }
 
     pub async fn revoke(&self, id: Uuid) -> Result<(), RepoError> {
-        sqlx::query(
-            "UPDATE sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL",
-        )
-        .bind(id)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 

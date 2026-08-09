@@ -43,10 +43,11 @@ impl Users {
     pub async fn create(&self, new_user: NewUser<'_>) -> Result<User, RepoError> {
         let row = sqlx::query_as::<_, User>(
             r#"
-            INSERT INTO users (email, email_lower, password_hash, role, status,
+            INSERT INTO users (email, password_hash, role, status,
                                first_name, last_name, username, is_verified)
-            VALUES ($1, lower($1), $2, 'user', 'pending_verification',
+            VALUES ($1, $2, 'user', 'pending_verification',
                     $3, $4, $5, false)
+            -- email_lower is a generated column; never insert it.
             RETURNING id, email, email_lower, password_hash, role, status,
                       username, is_verified, last_login_at, created_at
             "#,
@@ -106,7 +107,11 @@ impl Users {
     }
 
     /// Record a failed login attempt (feeds the lockout policy).
-    pub async fn record_failed_login(&self, user_id: Uuid, ip: Option<&std::net::IpAddr>) -> Result<(), RepoError> {
+    pub async fn record_failed_login(
+        &self,
+        user_id: Uuid,
+        ip: Option<&std::net::IpAddr>,
+    ) -> Result<(), RepoError> {
         sqlx::query(
             r#"
             INSERT INTO failed_logins (user_id, ip_address)
