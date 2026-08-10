@@ -176,6 +176,7 @@ async fn full_auth_flow_with_rotation_and_reuse_detection() {
     let cookie1 = refresh_cookie_value(&login).expect("refresh cookie set");
     let login_body = json_body(login).await;
     let access_token = login_body["access_token"].as_str().expect("access token");
+    let csrf1 = login_body["csrf_token"].as_str().expect("csrf token");
 
     // /me with the Bearer token.
     let me = app
@@ -188,8 +189,8 @@ async fn full_auth_flow_with_rotation_and_reuse_detection() {
     assert_eq!(me_body["user"]["email"], "barbara@example.com");
     assert_eq!(me_body["user"]["status"], "active");
 
-    // Refresh with the first cookie → rotation, new cookie.
-    let refresh1 = app
+    // Refresh WITHOUT the CSRF header → 403 (double-submit enforced).
+    let no_csrf = app
         .clone()
         .oneshot(
             Request::builder()
@@ -201,11 +202,32 @@ async fn full_auth_flow_with_rotation_and_reuse_detection() {
         )
         .await
         .unwrap();
+    assert_eq!(no_csrf.status(), StatusCode::FORBIDDEN);
+
+    // Refresh with cookie + CSRF header → rotation, new cookie.
+    let refresh1 = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/refresh")
+                .header(header::COOKIE, cookie_header(&cookie1))
+                .header("x-csrf-token", HeaderValue::from_str(csrf1).unwrap())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
     assert_eq!(refresh1.status(), StatusCode::OK);
     let cookie2 = refresh_cookie_value(&refresh1).expect("rotated cookie");
     assert_ne!(cookie1, cookie2, "refresh must rotate the token");
+    let refresh_body = json_body(refresh1).await;
+    let csrf2 = refresh_body["csrf_token"]
+        .as_str()
+        .expect("rotated csrf token");
 
-    // Reusing the ROTATED-AWAY cookie → 401 token_reuse_detected + family revoked.
+    // Reusing the ROTATED-AWAY cookie → 401 token_reuse_detected + family
+    // revoked. (The CSRF header must be the CURRENT one for the guard.)
     let reuse = app
         .clone()
         .oneshot(
@@ -213,6 +235,7 @@ async fn full_auth_flow_with_rotation_and_reuse_detection() {
                 .method("POST")
                 .uri("/api/v1/auth/refresh")
                 .header(header::COOKIE, cookie_header(&cookie1))
+                .header("x-csrf-token", HeaderValue::from_str(csrf2).unwrap())
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -230,6 +253,7 @@ async fn full_auth_flow_with_rotation_and_reuse_detection() {
                 .method("POST")
                 .uri("/api/v1/auth/refresh")
                 .header(header::COOKIE, cookie_header(&cookie2))
+                .header("x-csrf-token", HeaderValue::from_str(csrf2).unwrap())
                 .body(Body::empty())
                 .unwrap(),
         )
