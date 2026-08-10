@@ -10,6 +10,7 @@
 
 pub mod auth;
 pub mod error;
+pub mod middleware;
 pub mod rbac;
 
 use axum::extract::State;
@@ -22,6 +23,7 @@ use axum::{Json, Router};
 use error::ApiError;
 use serde_json::json;
 use sqlx::PgPool;
+use std::sync::Arc;
 use std::time::Instant;
 use tower_http::cors::CorsLayer;
 
@@ -31,19 +33,24 @@ pub struct AppState {
     pub pool: PgPool,
     pub started_at: Instant,
     pub auth: auth::AuthServices,
+    pub rate_limit: Arc<middleware::RateLimiter>,
 }
 
 /// Build the API router with the given state.
+///
+/// Rate tiers: state-changing auth routes are strict; reads get a generous
+/// default. The fallback (404) is intentionally not rate-limited.
 pub fn router(state: AppState) -> Router {
     Router::new()
-        .route("/healthz", get(healthz))
-        .route("/readyz", get(readyz))
-        .route("/api/v1/health", get(api_health))
         .route("/api/v1/auth/register", post(auth::register))
         .route("/api/v1/auth/verify-email", post(auth::verify_email))
         .route("/api/v1/auth/login", post(auth::login))
         .route("/api/v1/auth/refresh", post(auth::refresh))
         .route("/api/v1/auth/logout", post(auth::logout))
+        .route_layer(axum_mw::from_fn_with_state(
+            state.clone(),
+            middleware::rate_limit_auth,
+        ))
         .route("/api/v1/auth/me", get(auth::me))
         .route(
             "/api/v1/auth/sessions",
@@ -53,6 +60,13 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/auth/sessions/{id}",
             axum::routing::delete(auth::revoke_session),
         )
+        .route("/healthz", get(healthz))
+        .route("/readyz", get(readyz))
+        .route("/api/v1/health", get(api_health))
+        .route_layer(axum_mw::from_fn_with_state(
+            state.clone(),
+            middleware::rate_limit_default,
+        ))
         // Admin routes in their own sub-router so the RBAC layer only wraps
         // them — route_layer applies to everything added before it.
         .merge(
@@ -195,6 +209,7 @@ mod tests {
                 refresh_ttl: std::time::Duration::from_secs(604_800),
                 secure_cookies: false,
             },
+            rate_limit: std::sync::Arc::new(crate::middleware::RateLimiter::new()),
         })
     }
 
