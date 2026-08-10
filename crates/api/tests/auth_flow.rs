@@ -61,6 +61,7 @@ async fn test_app() -> Option<axum::Router> {
         pool,
         started_at: Instant::now(),
         auth: test_auth(),
+        rate_limit: std::sync::Arc::new(keystone_api::middleware::RateLimiter::new()),
     }))
 }
 
