@@ -301,6 +301,15 @@ pub async fn login(
         .evaluate(failures, last_failure, now)
         .is_err()
     {
+        audit(
+            &state.pool,
+            user.id,
+            "auth.login_locked",
+            "user",
+            &user.id.to_string(),
+            client_ip(&headers),
+        )
+        .await;
         return Err(ApiError::TooManyRequests);
     }
 
@@ -319,6 +328,15 @@ pub async fn login(
             .record_failed_login(user.id, client_ip(&headers).as_ref())
             .await
             .map_err(map_repo_error)?;
+        audit(
+            &state.pool,
+            user.id,
+            "auth.login_failed",
+            "user",
+            &user.id.to_string(),
+            client_ip(&headers),
+        )
+        .await;
         return Err(ApiError::Unauthorized);
     }
     users.record_login(user.id).await.map_err(map_repo_error)?;
@@ -364,6 +382,15 @@ pub async fn refresh(State(state): State<AppState>, headers: HeaderMap) -> ApiRe
             .rotate(live.id, new_session.id)
             .await
             .map_err(map_repo_error)?;
+        audit(
+            &state.pool,
+            live.user_id,
+            "auth.session_rotated",
+            "session",
+            &live.id.to_string(),
+            client_ip(&headers),
+        )
+        .await;
 
         let users = Users::new(state.pool.clone());
         let user = users
@@ -423,6 +450,15 @@ pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> ApiRes
                 .revoke_family(any.id)
                 .await
                 .map_err(map_repo_error)?;
+            audit(
+                &state.pool,
+                any.user_id,
+                "auth.logout",
+                "session",
+                &any.id.to_string(),
+                client_ip(&headers),
+            )
+            .await;
         }
     }
     let mut response = StatusCode::NO_CONTENT.into_response();
