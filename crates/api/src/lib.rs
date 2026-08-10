@@ -11,6 +11,7 @@
 pub mod auth;
 pub mod csrf;
 pub mod error;
+pub mod headers;
 pub mod middleware;
 pub mod rbac;
 
@@ -91,6 +92,7 @@ pub fn router(state: AppState) -> Router {
                 )),
         )
         .fallback(not_found)
+        .layer(axum_mw::from_fn(headers::security_headers))
         .with_state(state)
 }
 
