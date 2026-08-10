@@ -107,6 +107,13 @@ fn cookie_header(value: &str) -> HeaderValue {
     HeaderValue::from_str(&format!("{REFRESH_COOKIE}={value}")).expect("cookie must be valid")
 }
 
+/// Cookie header carrying the refresh cookie AND the matching CSRF cookie,
+/// as a legitimate SPA would send after login.
+fn cookies_header(refresh: &str, csrf: &str) -> HeaderValue {
+    HeaderValue::from_str(&format!("{REFRESH_COOKIE}={refresh}; keystone_csrf={csrf}"))
+        .expect("cookie must be valid")
+}
+
 #[tokio::test]
 async fn full_auth_flow_with_rotation_and_reuse_detection() {
     let Some(app) = test_app().await else {
@@ -204,14 +211,14 @@ async fn full_auth_flow_with_rotation_and_reuse_detection() {
         .unwrap();
     assert_eq!(no_csrf.status(), StatusCode::FORBIDDEN);
 
-    // Refresh with cookie + CSRF header → rotation, new cookie.
+    // Refresh with cookie + CSRF pair → rotation, new cookie.
     let refresh1 = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("POST")
                 .uri("/api/v1/auth/refresh")
-                .header(header::COOKIE, cookie_header(&cookie1))
+                .header(header::COOKIE, cookies_header(&cookie1, csrf1))
                 .header("x-csrf-token", HeaderValue::from_str(csrf1).unwrap())
                 .body(Body::empty())
                 .unwrap(),
@@ -227,14 +234,14 @@ async fn full_auth_flow_with_rotation_and_reuse_detection() {
         .expect("rotated csrf token");
 
     // Reusing the ROTATED-AWAY cookie → 401 token_reuse_detected + family
-    // revoked. (The CSRF header must be the CURRENT one for the guard.)
+    // revoked. (The CSRF pair must be the CURRENT one to pass the guard.)
     let reuse = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("POST")
                 .uri("/api/v1/auth/refresh")
-                .header(header::COOKIE, cookie_header(&cookie1))
+                .header(header::COOKIE, cookies_header(&cookie1, csrf2))
                 .header("x-csrf-token", HeaderValue::from_str(csrf2).unwrap())
                 .body(Body::empty())
                 .unwrap(),
@@ -252,7 +259,7 @@ async fn full_auth_flow_with_rotation_and_reuse_detection() {
             Request::builder()
                 .method("POST")
                 .uri("/api/v1/auth/refresh")
-                .header(header::COOKIE, cookie_header(&cookie2))
+                .header(header::COOKIE, cookies_header(&cookie2, csrf2))
                 .header("x-csrf-token", HeaderValue::from_str(csrf2).unwrap())
                 .body(Body::empty())
                 .unwrap(),
