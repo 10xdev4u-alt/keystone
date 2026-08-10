@@ -26,11 +26,35 @@ use base64::Engine;
 use keystone_db::repositories::users::{User, Users};
 use keystone_db::repositories::RepoError;
 use serde::Deserialize;
+use std::time::Duration;
 use url::form_urlencoded;
 
 const OAUTH_STATE_COOKIE: &str = "keystone_oauth_state";
 const OAUTH_STATE_BYTES: usize = 32;
 const OAUTH_STATE_TTL: std::time::Duration = std::time::Duration::from_secs(600);
+
+/// Bounded upstream I/O: a hung provider must time out into a 502, never
+/// hold a request open indefinitely (reqwest has no total timeout by
+/// default).
+const OAUTH_HTTP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Perform one provider call with a hard timeout. The future's error is
+/// reqwest's — anything else is a 502 with the call labelled.
+async fn provider_call<T, F>(label: &str, timeout: Duration, future: F) -> Result<T, ApiError>
+where
+    F: std::future::Future<Output = reqwest::Result<T>>,
+{
+    tokio::time::timeout(timeout, future)
+        .await
+        .map_err(|_| {
+            tracing::error!(upstream = label, timeout_secs = ?timeout, "OAuth provider call timed out");
+            ApiError::BadGateway(format!("OAuth {label} timed out"))
+        })?
+        .map_err(|e| {
+            tracing::error!(upstream = label, error = %e, "OAuth provider call failed");
+            ApiError::BadGateway(format!("OAuth {label} failed"))
+        })
+}
 
 /// OAuth HTTP client + provider configuration, held in [`crate::AppState`].
 #[derive(Clone)]
@@ -124,8 +148,9 @@ pub async fn callback(
         return Err(ApiError::BadRequest("OAuth state mismatch".into()));
     }
 
-    // Exchange the authorization code for an access token.
-    let token_response: TokenResponse = oauth
+    // Exchange the authorization code for an access token — bounded by
+    // OAUTH_HTTP_TIMEOUT; a hung provider yields 502, not a hung request.
+    let exchange = oauth
         .http
         .post(&oauth.provider.token_url)
         .form(&[
@@ -135,46 +160,42 @@ pub async fn callback(
             ("client_id", &oauth.provider.client_id),
             ("client_secret", &oauth.provider.client_secret),
         ])
-        .send()
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "OAuth token exchange request failed");
-            ApiError::BadGateway("OAuth token exchange failed".into())
-        })?
-        .error_for_status()
-        .map_err(|e| {
-            tracing::error!(error = %e, "OAuth provider rejected the code");
-            ApiError::BadGateway("OAuth provider rejected the authorization code".into())
-        })?
-        .json()
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "malformed OAuth token response");
-            ApiError::BadGateway("malformed OAuth token response".into())
-        })?;
+        .send();
+    let token_response: TokenResponse =
+        provider_call::<reqwest::Response, _>("token exchange", OAUTH_HTTP_TIMEOUT, exchange)
+            .await?
+            .error_for_status()
+            .map_err(|e| {
+                tracing::error!(error = %e, "OAuth provider rejected the code");
+                ApiError::BadGateway("OAuth provider rejected the authorization code".into())
+            })?
+            .json()
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "malformed OAuth token response");
+                ApiError::BadGateway("malformed OAuth token response".into())
+            })?;
 
-    // Fetch the profile with the freshly exchanged token.
-    let userinfo: UserInfo = oauth
+    // Fetch the profile with the freshly exchanged token — same hard bound.
+    let profile = oauth
         .http
         .get(&oauth.provider.userinfo_url)
         .bearer_auth(&token_response.access_token)
-        .send()
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "OAuth userinfo request failed");
-            ApiError::BadGateway("OAuth userinfo request failed".into())
-        })?
-        .error_for_status()
-        .map_err(|e| {
-            tracing::error!(error = %e, "OAuth userinfo rejected");
-            ApiError::BadGateway("OAuth userinfo rejected".into())
-        })?
-        .json()
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "malformed OAuth userinfo");
-            ApiError::BadGateway("malformed OAuth userinfo".into())
-        })?;
+        .send();
+    let userinfo: UserInfo =
+        provider_call::<reqwest::Response, _>("userinfo", OAUTH_HTTP_TIMEOUT, profile)
+            .await?
+            .error_for_status()
+            .map_err(|e| {
+                tracing::error!(error = %e, "OAuth userinfo rejected");
+                ApiError::BadGateway("OAuth userinfo rejected".into())
+            })?
+            .json()
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "malformed OAuth userinfo");
+                ApiError::BadGateway("malformed OAuth userinfo".into())
+            })?;
 
     let email = userinfo
         .email
@@ -386,6 +407,29 @@ mod tests {
         assert!(ct_eq("same-value", "same-value"));
         assert!(!ct_eq("same-value", "same-valuE"));
         assert!(!ct_eq("short", "longer-than-short"));
+    }
+
+    #[tokio::test]
+    async fn provider_call_times_out_a_hung_upstream() {
+        // A provider that never answers must yield 502, not hang the request.
+        let err = provider_call("slow provider", Duration::from_millis(20), async {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            Ok::<(), _>(())
+        })
+        .await
+        .unwrap_err();
+        assert!(matches!(err, ApiError::BadGateway(_)));
+    }
+
+    #[tokio::test]
+    async fn provider_call_propagates_upstream_success() {
+        // A fast, successful call passes through untouched.
+        let value = provider_call("fast provider", Duration::from_secs(1), async {
+            Ok::<_, reqwest::Error>("all good")
+        })
+        .await
+        .expect("fast provider must not fail");
+        assert_eq!(value, "all good");
     }
 
     #[test]
