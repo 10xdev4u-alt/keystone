@@ -12,9 +12,11 @@ on:
 
 permissions:
   contents: read
-  # gh pr comment posts via the ISSUES API, which requires issues: write —
-  # pull-requests: write alone is NOT sufficient (it only covers reviews).
+  # Commenting on a PR requires BOTH scopes for the bot token: the REST
+  # issues-comments endpoint is gated under pull-requests: write for PRs,
+  # while issues: write covers issue comments. Missing either → 403.
   issues: write
+  pull-requests: write
 
 concurrency:
   group: ai-review-${{ github.workflow }}-${{ github.ref }}
