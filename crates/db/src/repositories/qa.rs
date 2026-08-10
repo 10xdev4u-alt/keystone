@@ -214,6 +214,21 @@ impl Qa {
         Ok(bounty)
     }
 
+    pub async fn bounty_for_question_by_id(&self, id: Uuid) -> Result<Option<Bounty>, RepoError> {
+        let bounty = sqlx::query_as::<_, Bounty>(
+            r#"
+            SELECT id, question_id, amount, status, expires_at,
+                   awarded_answer_id, awarded_at, created_at
+            FROM bounties
+            WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(bounty)
+    }
+
     pub async fn bounty_for_question(
         &self,
         question_id: Uuid,
