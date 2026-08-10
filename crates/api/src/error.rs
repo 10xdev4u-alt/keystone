@@ -32,6 +32,8 @@ pub enum ApiError {
     Forbidden,
     #[error("conflict: {0}")]
     Conflict(String),
+    #[error("resource is locked")]
+    Locked,
     #[error("too many requests")]
     TooManyRequests,
     #[error("bad gateway: {0}")]
@@ -50,6 +52,7 @@ impl ApiError {
             ApiError::Unauthorized | ApiError::ReuseDetected => StatusCode::UNAUTHORIZED,
             ApiError::Forbidden => StatusCode::FORBIDDEN,
             ApiError::Conflict(_) => StatusCode::CONFLICT,
+            ApiError::Locked => StatusCode::LOCKED,
             ApiError::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
             ApiError::BadGateway(_) => StatusCode::BAD_GATEWAY,
             ApiError::Internal | ApiError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -64,6 +67,7 @@ impl ApiError {
             ApiError::ReuseDetected => "token_reuse_detected",
             ApiError::Forbidden => "forbidden",
             ApiError::Conflict(_) => "conflict",
+            ApiError::Locked => "locked",
             ApiError::TooManyRequests => "too_many_requests",
             ApiError::BadGateway(_) => "bad_gateway",
             ApiError::Internal | ApiError::Database(_) => "internal",
@@ -78,6 +82,7 @@ impl ApiError {
             ApiError::ReuseDetected => "Token reuse detected",
             ApiError::Forbidden => "Forbidden",
             ApiError::Conflict(_) => "Conflict",
+            ApiError::Locked => "Resource is locked",
             ApiError::TooManyRequests => "Too many requests",
             ApiError::BadGateway(_) => "Bad gateway",
             ApiError::Internal | ApiError::Database(_) => "Internal error",

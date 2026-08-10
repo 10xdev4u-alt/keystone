@@ -17,6 +17,7 @@ pub mod middleware;
 pub mod moderation;
 pub mod oauth;
 pub mod rbac;
+pub mod social;
 
 use axum::extract::State;
 use axum::http::header::{self, HeaderName, HeaderValue};
@@ -110,6 +111,53 @@ pub fn router(state: AppState) -> Router {
             axum::routing::put(content::add_bookmark).delete(content::remove_bookmark),
         )
         .route("/api/v1/me/bookmarks", get(content::my_bookmarks))
+        // ── Month 4: communities, polls, locking ──────────────────────
+        .route(
+            "/api/v1/communities",
+            get(social::list_communities).post(social::create_community),
+        )
+        .route("/api/v1/communities/{slug}", get(social::get_community))
+        .route(
+            "/api/v1/communities/{slug}/join",
+            post(social::join_community),
+        )
+        .route(
+            "/api/v1/communities/{slug}/leave",
+            axum::routing::delete(social::leave_community),
+        )
+        .route(
+            "/api/v1/communities/{slug}/members",
+            get(social::list_members),
+        )
+        .route(
+            "/api/v1/communities/{slug}/members/{member_id}",
+            axum::routing::patch(social::set_member_role),
+        )
+        .route(
+            "/api/v1/communities/{slug}/posts",
+            get(social::list_community_posts).post(social::add_community_post),
+        )
+        .route(
+            "/api/v1/communities/{slug}/posts/{post_id}",
+            axum::routing::delete(social::remove_community_post),
+        )
+        .route(
+            "/api/v1/communities/{slug}/posts/{post_id}/pin",
+            post(social::pin_community_post).delete(social::unpin_community_post),
+        )
+        .route("/api/v1/posts/{id}/poll", get(social::get_poll))
+        .route(
+            "/api/v1/posts/{id}/poll/options",
+            post(social::add_poll_option),
+        )
+        .route(
+            "/api/v1/posts/{id}/poll/votes",
+            axum::routing::put(social::vote_poll).delete(social::remove_poll_vote),
+        )
+        .route(
+            "/api/v1/posts/{id}/lock",
+            post(social::lock_post).delete(social::unlock_post),
+        )
         .route("/api/v1/reports", post(moderation::file_report))
         .route(
             "/api/v1/reviews",

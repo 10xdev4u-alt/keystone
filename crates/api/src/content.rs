@@ -60,7 +60,7 @@ fn is_staff(role: &str) -> bool {
 
 /// Slug from a title: lowercase ASCII alphanumerics and dashes. Empty input
 /// (no title) yields an empty string — callers fall back to a random id.
-fn slugify(title: &str) -> String {
+pub(crate) fn slugify(title: &str) -> String {
     let mut out = String::with_capacity(title.len());
     let mut last_dash = false;
     for ch in title.chars() {
@@ -268,7 +268,10 @@ pub async fn create_post(
     auth_user: AuthUser,
     Json(req): Json<CreatePostRequest>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
-    if !matches!(req.kind.as_str(), "article" | "post" | "question" | "poll") {
+    if !matches!(
+        req.kind.as_str(),
+        "article" | "post" | "question" | "poll" | "discussion"
+    ) {
         return Err(ApiError::BadRequest("unknown post kind".into()));
     }
     if !matches!(req.visibility.as_str(), "public" | "unlisted" | "private") {
@@ -523,6 +526,11 @@ pub async fn create_comment(
     Json(req): Json<CreateCommentRequest>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
     validate_text(&req.body, "comment body", COMMENT_MAX)?;
+    // Locked discussions refuse new comments (423 Locked).
+    let posts = Posts::new(state.pool.clone());
+    if posts.is_locked(post_id).await.map_err(map_repo_error)? {
+        return Err(ApiError::Locked);
+    }
     let comments = Comments::new(state.pool.clone());
     let comment = comments
         .create(NewComment {
