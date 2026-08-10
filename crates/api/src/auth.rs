@@ -701,6 +701,7 @@ pub(crate) fn map_repo_error(err: RepoError) -> ApiError {
     match err {
         RepoError::EmailTaken => ApiError::Conflict("email is already registered".into()),
         RepoError::UniqueViolation(msg) => ApiError::Conflict(msg),
+        RepoError::InvalidInput(msg) => ApiError::BadRequest(msg),
         RepoError::Database(e) => ApiError::Database(e),
     }
 }

@@ -1,0 +1,434 @@
+//! Content-core repository tests against a real Postgres: posts (versioning,
+//! soft delete, counters, slug collisions), comments (nesting rules), tags,
+//! reactions, and bookmarks.
+//!
+//! Self-skips when TEST_DATABASE_URL is unset (unit-only environments).
+
+use keystone_db::repositories::bookmarks::Bookmarks;
+use keystone_db::repositories::comments::{Comments, NewComment};
+use keystone_db::repositories::posts::{NewPost, PostUpdate, Posts};
+use keystone_db::repositories::reactions::Reactions;
+use keystone_db::repositories::tags::Tags;
+use keystone_db::repositories::users::{NewUser, Users};
+use sqlx::PgPool;
+use uuid::Uuid;
+
+/// Isolated per-test schema — parallel-safe against every other test binary.
+async fn test_pool() -> Option<PgPool> {
+    keystone_db::test_util::test_pool_isolated().await
+}
+
+/// A fresh user to own content.
+async fn make_user(pool: &PgPool, email: &str) -> Uuid {
+    let users = Users::new(pool.clone());
+    let user = users
+        .create(NewUser {
+            email,
+            password_hash: "not-a-real-hash",
+            first_name: Some("Test"),
+            last_name: Some("User"),
+            username: Some(email.split('@').next().unwrap()),
+        })
+        .await
+        .expect("user must be created");
+    user.id
+}
+
+#[tokio::test]
+async fn posts_create_read_update_version_and_soft_delete() {
+    let Some(pool) = test_pool().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let author = make_user(&pool, "poster@example.com").await;
+    let posts = Posts::new(pool.clone());
+
+    // Create — version 1 snapshot is written atomically.
+    let post = posts
+        .create(NewPost {
+            author_id: author,
+            kind: "article",
+            title: Some("Hello World"),
+            slug: "hello-world",
+            body: "First post body.",
+            summary: Some("A greeting"),
+            visibility: "public",
+        })
+        .await
+        .expect("post must be created");
+    assert_eq!(post.status, "published");
+    assert_eq!(post.view_count, 0);
+
+    let versions = posts.versions(post.id).await.unwrap();
+    assert_eq!(versions.len(), 1);
+    assert_eq!(versions[0].body, "First post body.");
+
+    // Read by slug and by id.
+    let by_slug = posts
+        .get_by_slug("hello-world")
+        .await
+        .unwrap()
+        .expect("found");
+    assert_eq!(by_slug.id, post.id);
+    let by_id = posts.get_by_id(post.id).await.unwrap().expect("found");
+    assert_eq!(by_id.id, post.id);
+
+    // Counters come from the maintained view (zero everywhere at first).
+    let listed = posts.list(Some("article"), None, 10, 0).await.unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].comment_count, 0);
+    assert_eq!(listed[0].reaction_count, 0);
+    assert_eq!(listed[0].bookmark_count, 0);
+
+    // View increment is transactional and cumulative.
+    posts.increment_view(post.id).await.unwrap();
+    posts.increment_view(post.id).await.unwrap();
+    assert_eq!(
+        posts.get_by_id(post.id).await.unwrap().unwrap().view_count,
+        2
+    );
+
+    // Update appends a second version and changes the content.
+    let updated = posts
+        .update(
+            post.id,
+            PostUpdate {
+                title: Some("Hello World v2"),
+                body: "Updated body.",
+                summary: None,
+                change_note: Some("fixed typo"),
+                editor_id: author,
+            },
+        )
+        .await
+        .unwrap()
+        .expect("update must touch a live post");
+    assert_eq!(updated.body, "Updated body.");
+    let versions = posts.versions(post.id).await.unwrap();
+    assert_eq!(versions.len(), 2, "history must be append-only");
+    assert_eq!(versions[0].body, "Updated body.");
+    assert_eq!(versions[1].body, "First post body.");
+
+    // Soft delete hides it from reads.
+    posts.soft_delete(post.id).await.unwrap().expect("deleted");
+    assert!(posts.get_by_slug("hello-world").await.unwrap().is_none());
+    assert!(posts.get_by_id(post.id).await.unwrap().is_none());
+    let listed = posts.list(None, None, 10, 0).await.unwrap();
+    assert!(listed.is_empty());
+    // History survives deletion.
+    assert_eq!(posts.versions(post.id).await.unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn post_slug_collision_surfaces_unique_violation() {
+    let Some(pool) = test_pool().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let author = make_user(&pool, "slugger@example.com").await;
+    let posts = Posts::new(pool.clone());
+    posts
+        .create(NewPost {
+            author_id: author,
+            kind: "post",
+            title: None,
+            slug: "same-slug",
+            body: "first",
+            summary: None,
+            visibility: "public",
+        })
+        .await
+        .unwrap();
+
+    let err = posts
+        .create(NewPost {
+            author_id: author,
+            kind: "post",
+            title: None,
+            slug: "same-slug",
+            body: "second",
+            summary: None,
+            visibility: "public",
+        })
+        .await
+        .unwrap_err();
+    match err {
+        keystone_db::repositories::RepoError::UniqueViolation(constraint) => {
+            assert_eq!(constraint, "posts_slug_key")
+        }
+        other => panic!("expected slug unique violation, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn comments_nest_within_a_post_only() {
+    let Some(pool) = test_pool().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let author = make_user(&pool, "commenter@example.com").await;
+    let posts = Posts::new(pool.clone());
+    let comments = Comments::new(pool.clone());
+
+    let post_a = posts
+        .create(NewPost {
+            author_id: author,
+            kind: "post",
+            title: None,
+            slug: "post-a",
+            body: "a",
+            summary: None,
+            visibility: "public",
+        })
+        .await
+        .unwrap();
+    let post_b = posts
+        .create(NewPost {
+            author_id: author,
+            kind: "post",
+            title: None,
+            slug: "post-b",
+            body: "b",
+            summary: None,
+            visibility: "public",
+        })
+        .await
+        .unwrap();
+
+    // Root comment + a reply on the same post.
+    let root = comments
+        .create(NewComment {
+            post_id: post_a.id,
+            author_id: author,
+            parent_id: None,
+            body: "root",
+        })
+        .await
+        .unwrap();
+    comments
+        .create(NewComment {
+            post_id: post_a.id,
+            author_id: author,
+            parent_id: Some(root.id),
+            body: "reply",
+        })
+        .await
+        .unwrap();
+
+    // Cross-post parent is rejected.
+    let err = comments
+        .create(NewComment {
+            post_id: post_b.id,
+            author_id: author,
+            parent_id: Some(root.id),
+            body: "sneaky",
+        })
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(err, keystone_db::repositories::RepoError::InvalidInput(_)),
+        "cross-post nesting must be rejected"
+    );
+
+    // Soft-deleted parent is not a valid target either.
+    comments.soft_delete(root.id).await.unwrap();
+    let err = comments
+        .create(NewComment {
+            post_id: post_a.id,
+            author_id: author,
+            parent_id: Some(root.id),
+            body: "reply to ghost",
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        keystone_db::repositories::RepoError::InvalidInput(_)
+    ));
+
+    // Listing shows only the visible comment (root was soft-deleted).
+    let listed = comments.list_by_post(post_a.id).await.unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].body, "reply");
+}
+
+#[tokio::test]
+async fn reactions_upsert_and_remove() {
+    let Some(pool) = test_pool().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let author = make_user(&pool, "reactor@example.com").await;
+    let posts = Posts::new(pool.clone());
+    let reactions = Reactions::new(pool.clone());
+
+    let post = posts
+        .create(NewPost {
+            author_id: author,
+            kind: "post",
+            title: None,
+            slug: "react-me",
+            body: "hi",
+            summary: None,
+            visibility: "public",
+        })
+        .await
+        .unwrap();
+
+    // Set, then change kind (one reaction per user per post).
+    reactions.set(post.id, author, "like").await.unwrap();
+    let reaction = reactions.set(post.id, author, "love").await.unwrap();
+    assert_eq!(reaction.kind, "love");
+    assert_eq!(
+        reactions.get(post.id, author).await.unwrap().unwrap().kind,
+        "love"
+    );
+
+    // Derived counter reflects exactly one reaction.
+    let listed = posts.list(None, None, 10, 0).await.unwrap();
+    assert_eq!(listed[0].reaction_count, 1);
+
+    reactions.remove(post.id, author).await.unwrap();
+    assert!(reactions.get(post.id, author).await.unwrap().is_none());
+    let listed = posts.list(None, None, 10, 0).await.unwrap();
+    assert_eq!(listed[0].reaction_count, 0);
+}
+
+#[tokio::test]
+async fn bookmarks_add_list_remove() {
+    let Some(pool) = test_pool().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let author = make_user(&pool, "bookmarker@example.com").await;
+    let posts = Posts::new(pool.clone());
+    let bookmarks = Bookmarks::new(pool.clone());
+
+    let post = posts
+        .create(NewPost {
+            author_id: author,
+            kind: "post",
+            title: None,
+            slug: "save-me",
+            body: "hi",
+            summary: None,
+            visibility: "public",
+        })
+        .await
+        .unwrap();
+
+    bookmarks.add(author, post.id).await.unwrap();
+    bookmarks.add(author, post.id).await.unwrap(); // idempotent
+    assert!(bookmarks.is_bookmarked(author, post.id).await.unwrap());
+    assert_eq!(
+        bookmarks.post_ids_for_user(author).await.unwrap(),
+        vec![post.id]
+    );
+
+    // Derived counter counts the bookmark once.
+    let listed = posts.list(None, None, 10, 0).await.unwrap();
+    assert_eq!(listed[0].bookmark_count, 1);
+
+    assert!(bookmarks.remove(author, post.id).await.unwrap());
+    assert!(!bookmarks.is_bookmarked(author, post.id).await.unwrap());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+async fn counters_never_drift_under_concurrent_writes() {
+    // Month-3 "Done when" criterion: derived counters must never drift, even
+    // when many writers race the same post. The counts come from the
+    // maintained `post_counts` view, so the only way to fail is a broken
+    // view or a lost write.
+    let Some(pool) = test_pool().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let author = make_user(&pool, "stress@example.com").await;
+    let posts = Posts::new(pool.clone());
+
+    let post = posts
+        .create(NewPost {
+            author_id: author,
+            kind: "post",
+            title: None,
+            slug: "stress-me",
+            body: "hi",
+            summary: None,
+            visibility: "public",
+        })
+        .await
+        .unwrap();
+
+    const N: usize = 50;
+    let mut handles = Vec::new();
+    for i in 0..N {
+        let pool = pool.clone();
+        handles.push(tokio::spawn(async move {
+            let comments = Comments::new(pool.clone());
+            let reactions = Reactions::new(pool.clone());
+            let bookmarks = Bookmarks::new(pool.clone());
+            let body = format!("comment {i}");
+            let _ = comments
+                .create(NewComment {
+                    post_id: post.id,
+                    author_id: author,
+                    parent_id: None,
+                    body: &body,
+                })
+                .await;
+            let _ = reactions
+                .set(post.id, author, if i % 2 == 0 { "like" } else { "love" })
+                .await;
+            let _ = bookmarks.add(author, post.id).await;
+        }));
+    }
+    for handle in handles {
+        handle.await.expect("writer task must not panic");
+    }
+
+    let listed = posts.list(None, None, 10, 0).await.unwrap();
+    assert_eq!(listed[0].comment_count, N as i64, "every comment counted");
+    assert_eq!(
+        listed[0].reaction_count, 1,
+        "one reaction per user per post"
+    );
+    assert_eq!(listed[0].bookmark_count, 1, "bookmark counted once");
+}
+
+#[tokio::test]
+async fn tags_ensure_is_case_insensitive_and_attachments_work() {
+    let Some(pool) = test_pool().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let author = make_user(&pool, "tagger@example.com").await;
+    let posts = Posts::new(pool.clone());
+    let tags = Tags::new(pool.clone());
+
+    let post = posts
+        .create(NewPost {
+            author_id: author,
+            kind: "article",
+            title: Some("Tagged"),
+            slug: "tagged",
+            body: "hi",
+            summary: None,
+            visibility: "public",
+        })
+        .await
+        .unwrap();
+
+    let rust = tags.ensure("Rust", "rust").await.unwrap();
+    let rust_again = tags.ensure("rust", "rust").await.unwrap();
+    assert_eq!(rust.id, rust_again.id, "case-insensitive find-or-create");
+
+    tags.attach(post.id, rust.id).await.unwrap();
+    tags.attach(post.id, rust.id).await.unwrap(); // idempotent
+
+    let for_post = tags.for_post(post.id).await.unwrap();
+    assert_eq!(for_post.len(), 1);
+    assert_eq!(for_post[0].name, "Rust");
+
+    assert!(tags.remove(post.id, rust.id).await.unwrap());
+    assert!(tags.for_post(post.id).await.unwrap().is_empty());
+}

@@ -5,7 +5,12 @@
 //! (sqlx offline metadata) lands as a dedicated hardening PR so it can be
 //! reviewed on its own.
 
+pub mod bookmarks;
+pub mod comments;
+pub mod posts;
+pub mod reactions;
 pub mod sessions;
+pub mod tags;
 pub mod users;
 
 /// Typed error for all repository operations.
@@ -17,4 +22,6 @@ pub enum RepoError {
     EmailTaken,
     #[error("conflicting unique value: {0}")]
     UniqueViolation(String),
+    #[error("invalid input: {0}")]
+    InvalidInput(String),
 }
