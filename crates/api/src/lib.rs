@@ -9,10 +9,12 @@
 #![forbid(unsafe_code)]
 
 pub mod auth;
+pub mod content;
 pub mod csrf;
 pub mod error;
 pub mod headers;
 pub mod middleware;
+pub mod moderation;
 pub mod oauth;
 pub mod rbac;
 
@@ -76,6 +78,55 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/auth/sessions/{id}",
             axum::routing::delete(auth::revoke_session),
+        )
+        // ── Content spine ────────────────────────────────────────────────
+        .route(
+            "/api/v1/posts",
+            get(content::list_posts).post(content::create_post),
+        )
+        .route(
+            "/api/v1/posts/{id}",
+            get(content::get_post)
+                .patch(content::update_post)
+                .delete(content::delete_post),
+        )
+        .route("/api/v1/posts/{id}/versions", get(content::post_versions))
+        .route("/api/v1/posts/{id}/view", post(content::record_view))
+        .route(
+            "/api/v1/posts/{id}/comments",
+            get(content::list_comments).post(content::create_comment),
+        )
+        .route(
+            "/api/v1/comments/{id}",
+            axum::routing::delete(content::delete_comment),
+        )
+        .route(
+            "/api/v1/posts/{id}/reaction",
+            axum::routing::put(content::set_reaction).delete(content::remove_reaction),
+        )
+        .route("/api/v1/posts/{id}/reactions", get(content::get_reactions))
+        .route(
+            "/api/v1/posts/{id}/bookmark",
+            axum::routing::put(content::add_bookmark).delete(content::remove_bookmark),
+        )
+        .route("/api/v1/me/bookmarks", get(content::my_bookmarks))
+        .route("/api/v1/reports", post(moderation::file_report))
+        .route(
+            "/api/v1/reviews",
+            get(moderation::list_reviews).put(moderation::upsert_review),
+        )
+        // ── Moderation (staff-only) ───────────────────────────────────────
+        .merge(
+            Router::new()
+                .route("/api/v1/moderation/reports", get(moderation::report_queue))
+                .route(
+                    "/api/v1/moderation/reports/{id}/resolve",
+                    post(moderation::resolve_report),
+                )
+                .route_layer(axum_mw::from_fn_with_state(
+                    state.clone(),
+                    rbac::require_moderator,
+                )),
         )
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
