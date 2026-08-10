@@ -10,6 +10,7 @@
 //! - Account lockout with exponential backoff before password verification.
 //! - `email_lower`/`status`/`role` live in the DB; the JWT only mirrors them.
 
+use crate::csrf;
 use crate::error::{ApiError, ApiResult};
 use crate::AppState;
 use axum::extract::{FromRequestParts, Path, State};
@@ -86,6 +87,9 @@ pub struct TokenResponse {
     pub access_token: String,
     pub token_type: &'static str,
     pub expires_in: u64,
+    /// CSRF double-submit token: echoed back in `X-CSRF-Token` on cookie
+    /// state-changing requests (refresh/logout).
+    pub csrf_token: String,
     pub user: UserView,
 }
 
@@ -583,10 +587,12 @@ fn respond_with_tokens(
         .issue(&user.id.to_string(), &user.role, None)
         .map_err(|_| ApiError::Internal)?;
 
+    let csrf_token = tokens::generate_refresh_token().map_err(|_| ApiError::Internal)?;
     let body = Json(TokenResponse {
         access_token,
         token_type: "Bearer",
         expires_in: state.auth.access_ttl.as_secs(),
+        csrf_token: csrf_token.clone(),
         user: UserView {
             id: user.id.to_string(),
             email: user.email,
@@ -602,6 +608,14 @@ fn respond_with_tokens(
         header::SET_COOKIE,
         refresh_cookie(
             refresh_token,
+            state.auth.refresh_ttl,
+            state.auth.secure_cookies,
+        ),
+    );
+    response.headers_mut().append(
+        header::SET_COOKIE,
+        csrf::csrf_cookie(
+            &csrf_token,
             state.auth.refresh_ttl,
             state.auth.secure_cookies,
         ),
