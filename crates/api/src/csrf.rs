@@ -7,7 +7,12 @@
 //!
 //! Flow: login/refresh set a NON-httpOnly `keystone_csrf` cookie (readable by
 //! the SPA) and return the token in the body. State-changing cookie requests
-//! must echo it back in the `X-CSRF-Token` header; mismatch → 403.
+//! must echo it back in the `X-CSRF-Token` header.
+//!
+//! The guard is STRICT and only ever wraps refresh/logout (see `router`): a
+//! request that lacks the CSRF cookie, the header, or carries a mismatched
+//! pair is rejected with 403. A legitimate client always has both — they are
+//! set and rotated together at login/refresh and share the same lifetime.
 
 use axum::body::Body;
 use axum::http::header::{self, HeaderValue};
@@ -42,7 +47,9 @@ pub fn read_csrf_cookie(headers: &HeaderMap) -> Option<String> {
 }
 
 /// Reject state-changing requests on cookie-authenticated routes unless the
-/// `X-CSRF-Token` header matches the `keystone_csrf` cookie.
+/// `X-CSRF-Token` header matches the `keystone_csrf` cookie. Strict: a
+/// missing cookie OR header is rejected — a legitimate client always has
+/// both (set together at login, rotated together at refresh).
 pub async fn csrf_guard(request: Request<Body>, next: Next) -> Response {
     if request.method() == Method::GET
         || request.method() == Method::HEAD
@@ -60,8 +67,6 @@ pub async fn csrf_guard(request: Request<Body>, next: Next) -> Response {
 
     match (cookie, header) {
         (Some(c), Some(h)) if c == h => next.run(request).await,
-        // No cookie → nothing to protect (no double-submit pair needed yet).
-        (None, _) => next.run(request).await,
         _ => StatusCode::FORBIDDEN.into_response(),
     }
 }

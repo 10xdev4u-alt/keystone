@@ -46,14 +46,24 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/auth/register", post(auth::register))
         .route("/api/v1/auth/verify-email", post(auth::verify_email))
         .route("/api/v1/auth/login", post(auth::login))
-        .route("/api/v1/auth/refresh", post(auth::refresh))
-        .route("/api/v1/auth/logout", post(auth::logout))
         .route_layer(axum_mw::from_fn_with_state(
             state.clone(),
             middleware::rate_limit_auth,
         ))
-        // Cookie-authenticated routes get the double-submit CSRF guard.
-        .route_layer(axum_mw::from_fn(csrf::csrf_guard))
+        // Cookie-authenticated routes get the double-submit CSRF guard in
+        // their own sub-router so it never wraps credential-based routes
+        // (register/login have no CSRF pair yet). The guard is strict: any
+        // state-changing request must present a matching cookie + header.
+        .merge(
+            Router::new()
+                .route("/api/v1/auth/refresh", post(auth::refresh))
+                .route("/api/v1/auth/logout", post(auth::logout))
+                .route_layer(axum_mw::from_fn_with_state(
+                    state.clone(),
+                    middleware::rate_limit_auth,
+                ))
+                .route_layer(axum_mw::from_fn(csrf::csrf_guard)),
+        )
         .route("/api/v1/auth/me", get(auth::me))
         .route(
             "/api/v1/auth/sessions",
