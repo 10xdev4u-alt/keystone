@@ -9,6 +9,7 @@
 #![forbid(unsafe_code)]
 
 pub mod auth;
+pub mod csrf;
 pub mod error;
 pub mod middleware;
 pub mod rbac;
@@ -51,6 +52,8 @@ pub fn router(state: AppState) -> Router {
             state.clone(),
             middleware::rate_limit_auth,
         ))
+        // Cookie-authenticated routes get the double-submit CSRF guard.
+        .route_layer(axum_mw::from_fn(csrf::csrf_guard))
         .route("/api/v1/auth/me", get(auth::me))
         .route(
             "/api/v1/auth/sessions",
