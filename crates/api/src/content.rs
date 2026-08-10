@@ -263,6 +263,7 @@ fn can_read(auth: Option<&AuthUser>, post: &keystone_db::repositories::posts::Po
 
 // ── Handlers: posts ────────────────────────────────────────────────────────
 
+#[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, kind = %req.kind))]
 pub async fn create_post(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -315,6 +316,7 @@ pub async fn create_post(
     )
     .await;
 
+    tracing::info!(post_id = %post.id, slug = %post.slug, "post created");
     Ok((
         StatusCode::CREATED,
         Json(json!({ "post": post_view(&post) })),
@@ -376,6 +378,7 @@ pub async fn list_posts(
     ))
 }
 
+#[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, post_id = %id))]
 pub async fn update_post(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -435,9 +438,11 @@ pub async fn update_post(
     )
     .await;
 
+    tracing::info!(post_id = %id, "post updated");
     Ok(Json(json!({ "post": post_view(&post) })))
 }
 
+#[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, post_id = %id))]
 pub async fn delete_post(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -466,6 +471,7 @@ pub async fn delete_post(
         None,
     )
     .await;
+    tracing::info!(post_id = %id, "post deleted");
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -516,6 +522,7 @@ pub async fn record_view(
 
 // ── Handlers: comments ─────────────────────────────────────────────────────
 
+#[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, post_id = %post_id))]
 pub async fn create_comment(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -542,6 +549,7 @@ pub async fn create_comment(
         None,
     )
     .await;
+    tracing::info!(comment_id = %comment.id, post_id = %post_id, "comment created");
     Ok((
         StatusCode::CREATED,
         Json(json!({
@@ -581,6 +589,7 @@ pub async fn list_comments(
     Ok(Json(json!({ "comments": items })))
 }
 
+#[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, comment_id = %id))]
 pub async fn delete_comment(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -609,11 +618,13 @@ pub async fn delete_comment(
         None,
     )
     .await;
+    tracing::info!(comment_id = %id, "comment deleted");
     Ok(StatusCode::NO_CONTENT)
 }
 
 // ── Handlers: reactions ────────────────────────────────────────────────────
 
+#[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, post_id = %post_id))]
 pub async fn set_reaction(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -631,6 +642,7 @@ pub async fn set_reaction(
         .set(post_id, auth_user.user_id, &req.kind)
         .await
         .map_err(map_repo_error)?;
+    tracing::info!(post_id = %post_id, kind = %reaction.kind, "reaction set");
     Ok(Json(json!({
         "reaction": {
             "id": reaction.id.to_string(),
@@ -640,6 +652,7 @@ pub async fn set_reaction(
     })))
 }
 
+#[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, post_id = %post_id))]
 pub async fn remove_reaction(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -650,6 +663,7 @@ pub async fn remove_reaction(
         .remove(post_id, auth_user.user_id)
         .await
         .map_err(map_repo_error)?;
+    tracing::info!(post_id = %post_id, "reaction removed");
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -692,6 +706,7 @@ pub async fn get_reactions(
 
 // ── Handlers: bookmarks ────────────────────────────────────────────────────
 
+#[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, post_id = %post_id))]
 pub async fn add_bookmark(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -702,9 +717,11 @@ pub async fn add_bookmark(
         .add(auth_user.user_id, post_id)
         .await
         .map_err(map_repo_error)?;
+    tracing::info!(post_id = %post_id, "bookmark added");
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, post_id = %post_id))]
 pub async fn remove_bookmark(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -715,6 +732,7 @@ pub async fn remove_bookmark(
         .remove(auth_user.user_id, post_id)
         .await
         .map_err(map_repo_error)?;
+    tracing::info!(post_id = %post_id, "bookmark removed");
     Ok(StatusCode::NO_CONTENT)
 }
 

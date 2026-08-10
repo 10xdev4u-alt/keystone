@@ -50,6 +50,7 @@ fn default_limit() -> i64 {
 
 // ── Reports ────────────────────────────────────────────────────────────────
 
+#[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, entity = %req.entity_type))]
 pub async fn file_report(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -88,6 +89,7 @@ pub async fn file_report(
     )
     .await;
 
+    tracing::info!(report_id = %report.id, entity = %report.entity_type, "report filed");
     Ok((
         StatusCode::CREATED,
         Json(json!({
@@ -137,6 +139,7 @@ pub async fn report_queue(
     ))
 }
 
+#[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, report_id = %id))]
 pub async fn resolve_report(
     State(state): State<AppState>,
     auth_user: AuthUser, // guarded by require_moderator at the router
@@ -186,6 +189,7 @@ pub async fn resolve_report(
     )
     .await;
 
+    tracing::info!(report_id = %id, "report resolved");
     Ok(Json(json!({
         "report": {
             "id": report.id.to_string(),
@@ -198,6 +202,7 @@ pub async fn resolve_report(
 
 // ── Reviews ────────────────────────────────────────────────────────────────
 
+#[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, entity = %req.entity_type))]
 pub async fn upsert_review(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -244,6 +249,7 @@ pub async fn upsert_review(
     )
     .await;
 
+    tracing::info!(review_id = %review.id, entity = %req.entity_type, "review upserted");
     Ok((
         StatusCode::CREATED,
         Json(json!({

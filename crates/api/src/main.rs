@@ -87,9 +87,28 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Wait for Ctrl-C (interactive) or SIGTERM (container orchestrators), then
+/// let axum's graceful shutdown drain in-flight requests.
 async fn shutdown_signal() {
-    tokio::signal::ctrl_c()
-        .await
-        .expect("failed to install ctrl-c handler");
-    tracing::info!("shutdown signal received");
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install ctrl-c handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => tracing::info!("ctrl-c received, shutting down"),
+        _ = terminate => tracing::info!("SIGTERM received, shutting down"),
+    }
 }
