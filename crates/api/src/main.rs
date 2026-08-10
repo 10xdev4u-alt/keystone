@@ -50,11 +50,25 @@ async fn main() -> anyhow::Result<()> {
         secure_cookies: config.app.app_url.starts_with("https://"),
     };
 
+    let oauth = match config.auth.oauth.google {
+        Some(provider) => {
+            let service = keystone_api::oauth::OAuthService::new(
+                provider,
+                config.auth.oauth.post_login_redirect.clone(),
+            )
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            tracing::info!("OAuth login enabled (Google)");
+            Some(service)
+        }
+        None => None,
+    };
+
     let state = AppState {
         pool,
         started_at: Instant::now(),
         auth,
         rate_limit: std::sync::Arc::new(keystone_api::middleware::RateLimiter::new()),
+        oauth,
     };
     let mut app = router(state);
     if !config.app.cors_origins.is_empty() {

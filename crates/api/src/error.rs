@@ -34,6 +34,8 @@ pub enum ApiError {
     Conflict(String),
     #[error("too many requests")]
     TooManyRequests,
+    #[error("bad gateway: {0}")]
+    BadGateway(String),
     #[error("internal error")]
     Internal,
     #[error("database error: {0}")]
@@ -49,6 +51,7 @@ impl ApiError {
             ApiError::Forbidden => StatusCode::FORBIDDEN,
             ApiError::Conflict(_) => StatusCode::CONFLICT,
             ApiError::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
+            ApiError::BadGateway(_) => StatusCode::BAD_GATEWAY,
             ApiError::Internal | ApiError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -62,6 +65,7 @@ impl ApiError {
             ApiError::Forbidden => "forbidden",
             ApiError::Conflict(_) => "conflict",
             ApiError::TooManyRequests => "too_many_requests",
+            ApiError::BadGateway(_) => "bad_gateway",
             ApiError::Internal | ApiError::Database(_) => "internal",
         }
     }
@@ -75,6 +79,7 @@ impl ApiError {
             ApiError::Forbidden => "Forbidden",
             ApiError::Conflict(_) => "Conflict",
             ApiError::TooManyRequests => "Too many requests",
+            ApiError::BadGateway(_) => "Bad gateway",
             ApiError::Internal | ApiError::Database(_) => "Internal error",
         }
     }

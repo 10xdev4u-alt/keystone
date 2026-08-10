@@ -57,6 +57,7 @@ async fn test_app() -> Option<(axum::Router, Arc<keystone_api::middleware::RateL
         started_at: Instant::now(),
         auth: test_auth(),
         rate_limit: limiter.clone(),
+        oauth: None,
     });
     Some((app, limiter))
 }

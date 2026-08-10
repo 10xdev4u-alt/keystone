@@ -13,6 +13,7 @@ pub mod csrf;
 pub mod error;
 pub mod headers;
 pub mod middleware;
+pub mod oauth;
 pub mod rbac;
 
 use axum::extract::State;
@@ -36,6 +37,8 @@ pub struct AppState {
     pub started_at: Instant,
     pub auth: auth::AuthServices,
     pub rate_limit: Arc<middleware::RateLimiter>,
+    /// OAuth login; `None` when no provider is configured (routes absent).
+    pub oauth: Option<oauth::OAuthService>,
 }
 
 /// Build the API router with the given state.
@@ -43,7 +46,7 @@ pub struct AppState {
 /// Rate tiers: state-changing auth routes are strict; reads get a generous
 /// default. The fallback (404) is intentionally not rate-limited.
 pub fn router(state: AppState) -> Router {
-    Router::new()
+    let router = Router::new()
         .route("/api/v1/auth/register", post(auth::register))
         .route("/api/v1/auth/verify-email", post(auth::verify_email))
         .route("/api/v1/auth/login", post(auth::login))
@@ -91,7 +94,20 @@ pub fn router(state: AppState) -> Router {
                     rbac::require_admin,
                 )),
         )
-        .fallback(not_found)
+        .fallback(not_found);
+
+    // OAuth routes exist only when a provider is configured — no surface to
+    // probe when login-by-Google is off.
+    let mut router = router;
+    if state.oauth.is_some() {
+        router = router.merge(
+            Router::<AppState>::new()
+                .route("/api/v1/auth/oauth/google/start", get(oauth::start))
+                .route("/api/v1/auth/oauth/google/callback", get(oauth::callback)),
+        );
+    }
+
+    router
         .layer(axum_mw::from_fn(headers::security_headers))
         .with_state(state)
 }
@@ -225,6 +241,7 @@ mod tests {
                 secure_cookies: false,
             },
             rate_limit: std::sync::Arc::new(crate::middleware::RateLimiter::new()),
+            oauth: None,
         })
     }
 
