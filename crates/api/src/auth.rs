@@ -674,6 +674,9 @@ fn respond_with_tokens(
 }
 
 /// Append-only audit event; best-effort (auditing must never break a request).
+/// Append an audit event. Best-effort by design — an audit insert must never
+/// fail the request — but a failure is an incident signal, so it is logged
+/// with full event context rather than swallowed.
 pub(crate) async fn audit(
     pool: &PgPool,
     actor: uuid::Uuid,
@@ -682,7 +685,7 @@ pub(crate) async fn audit(
     entity_id: &str,
     ip: Option<IpAddr>,
 ) {
-    let _ = sqlx::query(
+    let result = sqlx::query(
         r#"
         INSERT INTO audit_logs (actor_user_id, action, entity_type, entity_id, ip_address)
         VALUES ($1, $2, $3, $4, $5)
@@ -695,6 +698,16 @@ pub(crate) async fn audit(
     .bind(ip)
     .execute(pool)
     .await;
+    if let Err(e) = result {
+        tracing::error!(
+            actor = %actor,
+            action,
+            entity_type,
+            entity_id,
+            error = %e,
+            "audit event not persisted"
+        );
+    }
 }
 
 pub(crate) fn map_repo_error(err: RepoError) -> ApiError {
