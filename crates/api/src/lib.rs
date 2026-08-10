@@ -10,16 +10,19 @@
 
 pub mod auth;
 pub mod error;
+pub mod middleware;
 
 use axum::extract::State;
 use axum::http::header::{self, HeaderName, HeaderValue};
 use axum::http::{Method, StatusCode};
+use axum::middleware as axum_mw;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use error::ApiError;
 use serde_json::json;
 use sqlx::PgPool;
+use std::sync::Arc;
 use std::time::Instant;
 use tower_http::cors::CorsLayer;
 
@@ -29,20 +32,32 @@ pub struct AppState {
     pub pool: PgPool,
     pub started_at: Instant,
     pub auth: auth::AuthServices,
+    pub rate_limit: Arc<middleware::RateLimiter>,
 }
 
 /// Build the API router with the given state.
+///
+/// Rate tiers: state-changing auth routes are strict; reads get a generous
+/// default. The fallback (404) is intentionally not rate-limited.
 pub fn router(state: AppState) -> Router {
     Router::new()
-        .route("/healthz", get(healthz))
-        .route("/readyz", get(readyz))
-        .route("/api/v1/health", get(api_health))
         .route("/api/v1/auth/register", post(auth::register))
         .route("/api/v1/auth/verify-email", post(auth::verify_email))
         .route("/api/v1/auth/login", post(auth::login))
         .route("/api/v1/auth/refresh", post(auth::refresh))
         .route("/api/v1/auth/logout", post(auth::logout))
+        .route_layer(axum_mw::from_fn_with_state(
+            state.clone(),
+            middleware::rate_limit_auth,
+        ))
         .route("/api/v1/auth/me", get(auth::me))
+        .route("/healthz", get(healthz))
+        .route("/readyz", get(readyz))
+        .route("/api/v1/health", get(api_health))
+        .route_layer(axum_mw::from_fn_with_state(
+            state.clone(),
+            middleware::rate_limit_default,
+        ))
         .fallback(not_found)
         .with_state(state)
 }
@@ -148,6 +163,7 @@ mod tests {
                 refresh_ttl: std::time::Duration::from_secs(604_800),
                 secure_cookies: false,
             },
+            rate_limit: std::sync::Arc::new(crate::middleware::RateLimiter::new()),
         })
     }
 

@@ -54,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
         pool,
         started_at: Instant::now(),
         auth,
+        rate_limit: std::sync::Arc::new(keystone_api::middleware::RateLimiter::new()),
     };
     let mut app = router(state);
     if !config.app.cors_origins.is_empty() {
