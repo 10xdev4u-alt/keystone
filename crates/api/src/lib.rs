@@ -11,6 +11,7 @@
 pub mod auth;
 pub mod error;
 pub mod middleware;
+pub mod rbac;
 
 use axum::extract::State;
 use axum::http::header::{self, HeaderName, HeaderValue};
@@ -51,6 +52,14 @@ pub fn router(state: AppState) -> Router {
             middleware::rate_limit_auth,
         ))
         .route("/api/v1/auth/me", get(auth::me))
+        .route(
+            "/api/v1/auth/sessions",
+            get(auth::list_sessions).delete(auth::revoke_all_sessions),
+        )
+        .route(
+            "/api/v1/auth/sessions/{id}",
+            axum::routing::delete(auth::revoke_session),
+        )
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
         .route("/api/v1/health", get(api_health))
@@ -58,6 +67,16 @@ pub fn router(state: AppState) -> Router {
             state.clone(),
             middleware::rate_limit_default,
         ))
+        // Admin routes in their own sub-router so the RBAC layer only wraps
+        // them — route_layer applies to everything added before it.
+        .merge(
+            Router::new()
+                .route("/api/v1/admin/status", get(admin_status))
+                .route_layer(axum_mw::from_fn_with_state(
+                    state.clone(),
+                    rbac::require_admin,
+                )),
+        )
         .fallback(not_found)
         .with_state(state)
 }
@@ -110,6 +129,33 @@ async fn api_health(State(state): State<AppState>) -> Json<serde_json::Value> {
 
 async fn not_found() -> ApiError {
     ApiError::NotFound
+}
+
+/// Operator visibility: instance stats. RBAC-guarded (admin/super_admin).
+async fn admin_status(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let users = sqlx::query_scalar::<_, i64>("SELECT count(*) FROM users WHERE deleted_at IS NULL")
+        .fetch_one(&state.pool)
+        .await;
+    let live_sessions = sqlx::query_scalar::<_, i64>(
+        "SELECT count(*) FROM sessions WHERE revoked_at IS NULL AND expires_at > now()",
+    )
+    .fetch_one(&state.pool)
+    .await;
+
+    match (users, live_sessions) {
+        (Ok(users), Ok(live_sessions)) => Json(json!({
+            "status": "ok",
+            "uptime_secs": state.started_at.elapsed().as_secs(),
+            "users": users,
+            "live_sessions": live_sessions,
+        })),
+        _ => Json(json!({
+            "status": "degraded",
+            "uptime_secs": state.started_at.elapsed().as_secs(),
+            "users": null,
+            "live_sessions": null,
+        })),
+    }
 }
 
 #[cfg(test)]

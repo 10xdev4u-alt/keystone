@@ -75,6 +75,22 @@ impl Sessions {
         Ok(row)
     }
 
+    /// Find any session (live or not) by id — for ownership checks.
+    pub async fn find_by_id(&self, id: Uuid) -> Result<Option<Session>, RepoError> {
+        let row = sqlx::query_as::<_, Session>(
+            r#"
+            SELECT id, user_id, refresh_token_hash, user_agent, ip_address,
+                   expires_at, created_at, revoked_at, replaced_by_session_id
+            FROM sessions
+            WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
     /// All live sessions for a user (session list / revoke-all).
     pub async fn live_for_user(&self, user_id: Uuid) -> Result<Vec<Session>, RepoError> {
         let rows = sqlx::query_as::<_, Session>(

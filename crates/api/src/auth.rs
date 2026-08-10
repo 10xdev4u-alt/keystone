@@ -12,7 +12,7 @@
 
 use crate::error::{ApiError, ApiResult};
 use crate::AppState;
-use axum::extract::{FromRequestParts, State};
+use axum::extract::{FromRequestParts, Path, State};
 use axum::http::header::{self, HeaderMap, HeaderValue};
 use axum::http::{request::Parts, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -448,6 +448,90 @@ pub async fn me(
         status: user.status,
         is_verified: user.is_verified,
     } })))
+}
+
+// ── Session management ──────────────────────────────────────────────────────
+
+/// List the authenticated user's live sessions; the one matching the current
+/// refresh cookie is marked `current`.
+pub async fn list_sessions(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    auth_user: AuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    let sessions = Sessions::new(state.pool.clone());
+    let current_hash = read_refresh_cookie(&headers).map(|t| tokens::hash_refresh_token(&t));
+    let list = sessions
+        .live_for_user(auth_user.user_id)
+        .await
+        .map_err(map_repo_error)?;
+
+    let sessions_json: Vec<serde_json::Value> = list
+        .iter()
+        .map(|s| {
+            json!({
+                "id": s.id,
+                "created_at": s.created_at,
+                "expires_at": s.expires_at,
+                "ip_address": s.ip_address.as_ref().map(|ip| ip.to_string()),
+                "user_agent": s.user_agent,
+                "current": current_hash.as_deref() == Some(s.refresh_token_hash.as_str()),
+            })
+        })
+        .collect();
+
+    Ok(Json(json!({ "sessions": sessions_json })))
+}
+
+/// Revoke one session. Ownership is enforced: another user's session id
+/// answers 404, never revealing its existence.
+pub async fn revoke_session(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    auth_user: AuthUser,
+    Path(id): Path<uuid::Uuid>,
+) -> ApiResult<Response> {
+    let sessions = Sessions::new(state.pool.clone());
+    let Some(session) = sessions.find_by_id(id).await.map_err(map_repo_error)? else {
+        return Err(ApiError::NotFound);
+    };
+    if session.user_id != auth_user.user_id {
+        return Err(ApiError::NotFound);
+    }
+    sessions.revoke_family(id).await.map_err(map_repo_error)?;
+    audit(
+        &state.pool,
+        auth_user.user_id,
+        "auth.session_revoked",
+        "session",
+        &id.to_string(),
+        client_ip(&headers),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+/// Revoke all live sessions for the authenticated user.
+pub async fn revoke_all_sessions(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    auth_user: AuthUser,
+) -> ApiResult<Response> {
+    let sessions = Sessions::new(state.pool.clone());
+    sessions
+        .revoke_all_for_user(auth_user.user_id)
+        .await
+        .map_err(map_repo_error)?;
+    audit(
+        &state.pool,
+        auth_user.user_id,
+        "auth.sessions_revoked_all",
+        "user",
+        &auth_user.user_id.to_string(),
+        client_ip(&headers),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT.into_response())
 }
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
