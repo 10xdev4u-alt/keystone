@@ -432,3 +432,241 @@ async fn tags_ensure_is_case_insensitive_and_attachments_work() {
     assert!(tags.remove(post.id, rust.id).await.unwrap());
     assert!(tags.for_post(post.id).await.unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn series_append_ordered_posts_and_soft_delete() {
+    let Some(pool) = test_pool().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let author = make_user(&pool, "seriator@example.com").await;
+    let posts = Posts::new(pool.clone());
+    let series = keystone_db::repositories::series::SeriesRepo::new(pool.clone());
+
+    let created = series
+        .create(keystone_db::repositories::series::NewSeries {
+            author_id: author,
+            title: "My Series",
+            slug: "my-series",
+            description: Some("A test series"),
+        })
+        .await
+        .unwrap();
+    assert_eq!(created.slug, "my-series");
+    assert_eq!(
+        series.get_by_slug("my-series").await.unwrap().unwrap().id,
+        created.id
+    );
+
+    // Appends land in order (max + 1 each time).
+    let mut post_ids = Vec::new();
+    for n in 0..3 {
+        let post = posts
+            .create(NewPost {
+                author_id: author,
+                kind: "article",
+                title: Some(&format!("Part {n}")),
+                slug: &format!("my-series-part-{n}"),
+                body: "body",
+                summary: None,
+                visibility: "public",
+            })
+            .await
+            .unwrap();
+        post_ids.push(post.id);
+        series.add_post(created.id, post.id).await.unwrap();
+    }
+    series.add_post(created.id, post_ids[1]).await.unwrap(); // idempotent
+
+    let listed = series.list_posts(created.id).await.unwrap();
+    assert_eq!(listed.len(), 3);
+    assert_eq!(listed[0].post_id, post_ids[0]);
+    assert_eq!(listed[1].position, 1);
+    assert_eq!(listed[2].position, 2);
+
+    // Removing a post shifts nothing; soft-deleting a post hides it.
+    assert!(series.remove_post(created.id, post_ids[1]).await.unwrap());
+    assert_eq!(series.list_posts(created.id).await.unwrap().len(), 2);
+    posts.soft_delete(post_ids[0]).await.unwrap();
+    let listed = series.list_posts(created.id).await.unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].post_id, post_ids[2]);
+
+    // Slug uniqueness is scoped to live rows.
+    let err = series
+        .create(keystone_db::repositories::series::NewSeries {
+            author_id: author,
+            title: "Dup",
+            slug: "my-series",
+            description: None,
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        keystone_db::repositories::RepoError::UniqueViolation(_)
+    ));
+
+    // Soft delete hides the series entirely.
+    series
+        .soft_delete(created.id)
+        .await
+        .unwrap()
+        .expect("deleted");
+    assert!(series.get_by_slug("my-series").await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn reviews_upsert_list_and_resurrect_after_delete() {
+    let Some(pool) = test_pool().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let author = make_user(&pool, "reviewer@example.com").await;
+    let reviews = keystone_db::repositories::reviews::Reviews::new(pool.clone());
+    let entity = Uuid::new_v4();
+
+    let first = reviews
+        .upsert(keystone_db::repositories::reviews::NewReview {
+            author_id: author,
+            entity_type: "employer",
+            entity_id: entity,
+            rating: 4,
+            title: Some("Solid"),
+            body: Some("Would recommend."),
+        })
+        .await
+        .unwrap();
+    assert_eq!(first.rating, 4);
+
+    // Editing replaces (one review per author per entity).
+    let second = reviews
+        .upsert(keystone_db::repositories::reviews::NewReview {
+            author_id: author,
+            entity_type: "employer",
+            entity_id: entity,
+            rating: 5,
+            title: Some("Solid v2"),
+            body: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(second.id, first.id);
+    assert_eq!(second.rating, 5);
+
+    let listed = reviews.list_by_entity("employer", entity).await.unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].rating, 5);
+
+    // Different entity type is a different review.
+    let other = Uuid::new_v4();
+    reviews
+        .upsert(keystone_db::repositories::reviews::NewReview {
+            author_id: author,
+            entity_type: "vendor",
+            entity_id: other,
+            rating: 1,
+            title: None,
+            body: Some("Meh"),
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        reviews
+            .list_by_entity("employer", entity)
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        reviews.list_by_entity("vendor", other).await.unwrap().len(),
+        1
+    );
+
+    // Soft delete hides; a later upsert resurrects the same row.
+    reviews
+        .soft_delete(second.id)
+        .await
+        .unwrap()
+        .expect("deleted");
+    assert!(reviews
+        .list_by_entity("employer", entity)
+        .await
+        .unwrap()
+        .is_empty());
+    let revived = reviews
+        .upsert(keystone_db::repositories::reviews::NewReview {
+            author_id: author,
+            entity_type: "employer",
+            entity_id: entity,
+            rating: 3,
+            title: None,
+            body: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(revived.id, second.id, "same row resurrected");
+    assert_eq!(revived.status, "published");
+    assert!(reviews
+        .get(author, "employer", entity)
+        .await
+        .unwrap()
+        .is_some());
+}
+
+#[tokio::test]
+async fn reports_flow_lifecycle_and_moderation_trail() {
+    let Some(pool) = test_pool().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let reporter = make_user(&pool, "whistle@example.com").await;
+    let moderator = make_user(&pool, "mod@example.com").await;
+    let reports = keystone_db::repositories::reports::Reports::new(pool.clone());
+    let moderation = keystone_db::repositories::moderation::Moderation::new(pool.clone());
+    let target = Uuid::new_v4();
+
+    let report = reports
+        .create(keystone_db::repositories::reports::NewReport {
+            reporter_id: reporter,
+            entity_type: "post",
+            entity_id: target,
+            reason: "spam",
+            detail: Some("Repeated advertising"),
+        })
+        .await
+        .unwrap();
+    assert_eq!(report.status, "open");
+
+    let open = reports.list_open(10, 0).await.unwrap();
+    assert_eq!(open.len(), 1);
+    assert_eq!(open[0].entity_id, target);
+
+    // The moderator resolves it and the append-only trail records the call.
+    let resolved = reports
+        .update_status(report.id, "resolved", moderator, Some("hidden the post"))
+        .await
+        .unwrap()
+        .expect("report exists");
+    assert_eq!(resolved.status, "resolved");
+    assert_eq!(resolved.resolved_by, Some(moderator));
+    assert!(resolved.resolved_at.is_some());
+    assert!(reports.list_open(10, 0).await.unwrap().is_empty());
+
+    moderation
+        .record(keystone_db::repositories::moderation::NewModerationAction {
+            moderator_id: moderator,
+            action: "delete_post",
+            target_type: "post",
+            target_id: target,
+            reason: Some("spam per report"),
+        })
+        .await
+        .unwrap();
+
+    let trail = moderation.list_by_target("post", target).await.unwrap();
+    assert_eq!(trail.len(), 1);
+    assert_eq!(trail[0].action, "delete_post");
+    assert_eq!(trail[0].moderator_id, moderator);
+}
