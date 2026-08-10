@@ -163,7 +163,7 @@ async fn json_body(response: axum::response::Response) -> Value {
 }
 
 /// Extract one cookie value by name from a response's Set-Cookie headers.
-fn cookie_value<'a>(response: &'a axum::response::Response, name: &str) -> Option<String> {
+fn cookie_value(response: &axum::response::Response, name: &str) -> Option<String> {
     for value in response.headers().get_all(header::SET_COOKIE) {
         let raw = value.to_str().ok()?;
         if let Some(rest) = raw.strip_prefix(&format!("{name}=")) {
