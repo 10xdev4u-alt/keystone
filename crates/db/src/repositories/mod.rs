@@ -7,8 +7,12 @@
 
 pub mod bookmarks;
 pub mod comments;
+pub mod communities;
+pub mod community_posts;
 pub mod moderation;
+pub mod polls;
 pub mod posts;
+pub mod qa;
 pub mod reactions;
 pub mod reports;
 pub mod reviews;
