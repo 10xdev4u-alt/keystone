@@ -95,7 +95,7 @@ pub struct TokenResponse {
 
 // ── Cookie helpers ──────────────────────────────────────────────────────────
 
-fn refresh_cookie(value: &str, max_age: Duration, secure: bool) -> HeaderValue {
+pub(crate) fn refresh_cookie(value: &str, max_age: Duration, secure: bool) -> HeaderValue {
     let mut cookie = format!(
         "{REFRESH_COOKIE}={value}; Max-Age={}; Path={REFRESH_COOKIE_PATH}; HttpOnly; SameSite=Strict",
         max_age.as_secs()
@@ -117,7 +117,7 @@ fn read_refresh_cookie(headers: &HeaderMap) -> Option<String> {
 
 /// Best-effort client IP: first `X-Forwarded-For` entry when behind a proxy,
 /// else none. Trust boundary documented in the threat model.
-fn client_ip(headers: &HeaderMap) -> Option<IpAddr> {
+pub(crate) fn client_ip(headers: &HeaderMap) -> Option<IpAddr> {
     let value = headers.get("x-forwarded-for")?.to_str().ok()?;
     value.split(',').next()?.trim().parse().ok()
 }
@@ -398,7 +398,8 @@ pub async fn refresh(State(state): State<AppState>, headers: HeaderMap) -> ApiRe
             .await
             .map_err(map_repo_error)?
             .ok_or(ApiError::Unauthorized)?;
-        return respond_with_tokens(&state, user, &new_token);
+        let csrf_token = tokens::generate_refresh_token().map_err(|_| ApiError::Internal)?;
+        return respond_with_tokens(&state, user, &new_token, &csrf_token);
     }
 
     // Not live: is this a rotated-away token being replayed? Revoke the family.
@@ -576,13 +577,14 @@ pub async fn revoke_all_sessions(
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
-/// Issue an access token + refresh session for a just-authenticated user.
-async fn issue_session(
+/// Create a refresh session for a just-authenticated user and return the
+/// (refresh_token, csrf_token, user) triple. Shared by password login and
+/// OAuth login; callers build their own response (JSON body vs redirect).
+pub(crate) async fn issue_session_cookies(
     state: &AppState,
     user_id: uuid::Uuid,
-    role: &str,
     headers: &HeaderMap,
-) -> ApiResult<Response> {
+) -> ApiResult<(String, String, keystone_db::repositories::users::User)> {
     let refresh_token = tokens::generate_refresh_token().map_err(|_| ApiError::Internal)?;
     let refresh_hash = tokens::hash_refresh_token(&refresh_token);
     let expires_at = chrono::Utc::now()
@@ -607,8 +609,20 @@ async fn issue_session(
         .await
         .map_err(map_repo_error)?
         .ok_or(ApiError::Unauthorized)?;
+    let csrf_token = tokens::generate_refresh_token().map_err(|_| ApiError::Internal)?;
+    Ok((refresh_token, csrf_token, user))
+}
+
+/// Issue an access token + refresh session for a just-authenticated user.
+async fn issue_session(
+    state: &AppState,
+    user_id: uuid::Uuid,
+    role: &str,
+    headers: &HeaderMap,
+) -> ApiResult<Response> {
+    let (refresh_token, csrf_token, user) = issue_session_cookies(state, user_id, headers).await?;
     let _ = role;
-    respond_with_tokens(state, user, &refresh_token)
+    respond_with_tokens(state, user, &refresh_token, &csrf_token)
 }
 
 /// Build the token response: access token in body, refresh cookie on the side.
@@ -616,6 +630,7 @@ fn respond_with_tokens(
     state: &AppState,
     user: keystone_db::repositories::users::User,
     refresh_token: &str,
+    csrf_token: &str,
 ) -> ApiResult<Response> {
     let access_token = state
         .auth
@@ -623,12 +638,11 @@ fn respond_with_tokens(
         .issue(&user.id.to_string(), &user.role, None)
         .map_err(|_| ApiError::Internal)?;
 
-    let csrf_token = tokens::generate_refresh_token().map_err(|_| ApiError::Internal)?;
     let body = Json(TokenResponse {
         access_token,
         token_type: "Bearer",
         expires_in: state.auth.access_ttl.as_secs(),
-        csrf_token: csrf_token.clone(),
+        csrf_token: csrf_token.to_owned(),
         user: UserView {
             id: user.id.to_string(),
             email: user.email,
@@ -651,7 +665,7 @@ fn respond_with_tokens(
     response.headers_mut().append(
         header::SET_COOKIE,
         csrf::csrf_cookie(
-            &csrf_token,
+            csrf_token,
             state.auth.refresh_ttl,
             state.auth.secure_cookies,
         ),
@@ -660,7 +674,7 @@ fn respond_with_tokens(
 }
 
 /// Append-only audit event; best-effort (auditing must never break a request).
-async fn audit(
+pub(crate) async fn audit(
     pool: &PgPool,
     actor: uuid::Uuid,
     action: &str,
@@ -683,7 +697,7 @@ async fn audit(
     .await;
 }
 
-fn map_repo_error(err: RepoError) -> ApiError {
+pub(crate) fn map_repo_error(err: RepoError) -> ApiError {
     match err {
         RepoError::EmailTaken => ApiError::Conflict("email is already registered".into()),
         RepoError::UniqueViolation(msg) => ApiError::Conflict(msg),

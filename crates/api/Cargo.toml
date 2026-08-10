@@ -26,6 +26,10 @@ uuid.workspace = true
 dotenvy.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+url = "2"
+base64.workspace = true
+getrandom.workspace = true
 
 [dev-dependencies]
 keystone-db = { path = "../db", features = ["test-util"] }

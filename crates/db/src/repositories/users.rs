@@ -38,6 +38,43 @@ impl Users {
         Self { pool }
     }
 
+    /// Insert an OAuth-provisioned user: active immediately (the provider
+    /// already verified the email), passwordless. Unique violations (email OR
+    /// username) surface as [`RepoError::UniqueViolation`] with the constraint
+    /// name so the caller can retry with a different username.
+    pub async fn create_oauth(
+        &self,
+        email: &str,
+        first_name: Option<&str>,
+        last_name: Option<&str>,
+        username: Option<&str>,
+        is_verified: bool,
+    ) -> Result<User, RepoError> {
+        let row = sqlx::query_as::<_, User>(
+            r#"
+            INSERT INTO users (email, password_hash, role, status,
+                               first_name, last_name, username, is_verified)
+            VALUES ($1, NULL, 'user', 'active', $2, $3, $4, $5)
+            RETURNING id, email, email_lower, password_hash, role, status,
+                      username, is_verified, last_login_at, created_at
+            "#,
+        )
+        .bind(email)
+        .bind(first_name)
+        .bind(last_name)
+        .bind(username)
+        .bind(is_verified)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::Database(db) if db.is_unique_violation() => {
+                RepoError::UniqueViolation(db.constraint().unwrap_or("unknown").to_string())
+            }
+            other => RepoError::Database(other),
+        })?;
+        Ok(row)
+    }
+
     /// Insert a new user in `pending_verification` status. Unique-email
     /// collisions surface as [`RepoError::EmailTaken`].
     pub async fn create(&self, new_user: NewUser<'_>) -> Result<User, RepoError> {
