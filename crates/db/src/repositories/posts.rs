@@ -267,6 +267,16 @@ impl Posts {
         Ok(())
     }
 
+    /// Author of a post even when soft-deleted — history and audit access
+    /// must survive deletion, so ownership checks use this, not [`get_by_id`].
+    pub async fn author_of(&self, id: Uuid) -> Result<Option<Uuid>, RepoError> {
+        let author = sqlx::query_scalar("SELECT author_id FROM posts WHERE id = $1")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(author)
+    }
+
     /// Full version history, newest first.
     pub async fn versions(&self, post_id: Uuid) -> Result<Vec<PostVersion>, RepoError> {
         let rows = sqlx::query_as::<_, PostVersion>(
