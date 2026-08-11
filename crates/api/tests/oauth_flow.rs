@@ -91,6 +91,7 @@ async fn test_app() -> Option<(axum::Router, PgPool)> {
         auth: test_auth(),
         rate_limit: Arc::new(keystone_api::middleware::RateLimiter::new()),
         realtime: Arc::new(keystone_api::realtime::RealtimeHub::new()),
+        storage: std::sync::Arc::new(keystone_db::storage::MemoryStorage::new()),
         oauth: Some(oauth),
     });
     Some((app, pool))

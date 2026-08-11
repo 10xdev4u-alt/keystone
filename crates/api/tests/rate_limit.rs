@@ -58,6 +58,7 @@ async fn test_app() -> Option<(axum::Router, Arc<keystone_api::middleware::RateL
         auth: test_auth(),
         rate_limit: limiter.clone(),
         realtime: std::sync::Arc::new(keystone_api::realtime::RealtimeHub::new()),
+        storage: std::sync::Arc::new(keystone_db::storage::MemoryStorage::new()),
         oauth: None,
     });
     Some((app, limiter))
