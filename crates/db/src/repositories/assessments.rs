@@ -251,7 +251,7 @@ impl Assessments {
             return Err(RepoError::InvalidInput(
                 "assessment has no questions".into(),
             ));
-        }        // Server-side key: the expected response lives on the question row.
+        } // Server-side key: the expected response lives on the question row.
         let keys: Vec<(Uuid, String)> = sqlx::query_as(
             r#"
             SELECT id, correct_response FROM assessment_questions
@@ -264,8 +264,7 @@ impl Assessments {
 
         let mut correct_count = 0i64;
         for answer in answers {
-            let Some((_, expected)) =
-                keys.iter().find(|(qid, _)| *qid == answer.question_id)
+            let Some((_, expected)) = keys.iter().find(|(qid, _)| *qid == answer.question_id)
             else {
                 continue; // unknown or unscored question — never counted
             };
