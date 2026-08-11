@@ -67,7 +67,7 @@ pub struct StepRequest {
 }
 
 #[derive(Deserialize, ToSchema)]
-pub struct AssessmentRequest {
+pub struct CareerAssessmentRequest {
     pub career_path_id: Uuid,
     pub score: i32,
     pub notes: Option<String>,
@@ -516,7 +516,7 @@ pub async fn get_career_path(
 #[utoipa::path(
     post,
     path = "/api/v1/me/assessments",
-    request_body = AssessmentRequest,
+    request_body = CareerAssessmentRequest,
     responses(
         (status = 201, description = "Assessment recorded", body = Value),
         (status = 401, description = "Missing or invalid access token"),
@@ -527,7 +527,7 @@ pub async fn get_career_path(
 pub async fn add_assessment(
     State(state): State<AppState>,
     auth_user: AuthUser,
-    Json(req): Json<AssessmentRequest>,
+    Json(req): Json<CareerAssessmentRequest>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
     let careers = Careers::new(state.pool.clone());
     let assessment = careers

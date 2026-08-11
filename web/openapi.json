@@ -331,7 +331,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RegisterRequest"
+                "$ref": "#/components/schemas/SignupRequest"
               }
             }
           },
@@ -724,7 +724,9 @@
             "description": "Communities page",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityList"
+                }
               }
             }
           }
@@ -2352,7 +2354,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AssessmentRequest"
+                "$ref": "#/components/schemas/CareerAssessmentRequest"
               }
             }
           },
@@ -3985,7 +3987,9 @@
             "description": "Page of posts + next_cursor",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PostListPage"
+                }
               }
             }
           }
@@ -4053,7 +4057,9 @@
             "description": "Post with author, tags and stats",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetailResponse"
+                }
               }
             }
           },
@@ -4450,7 +4456,9 @@
             "description": "Comment tree",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CommentList"
+                }
               }
             }
           }
@@ -4489,7 +4497,9 @@
             "description": "Comment created",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CommentResponse"
+                }
               }
             }
           },
@@ -5617,6 +5627,29 @@
           }
         }
       },
+      "CareerAssessmentRequest": {
+        "type": "object",
+        "required": [
+          "career_path_id",
+          "score"
+        ],
+        "properties": {
+          "career_path_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "score": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "CareerPathRequest": {
         "type": "object",
         "required": [
@@ -5641,6 +5674,120 @@
         ],
         "properties": {
           "domain": {
+            "type": "string"
+          }
+        }
+      },
+      "CommentList": {
+        "type": "object",
+        "description": "Comment thread for a post.",
+        "required": [
+          "comments"
+        ],
+        "properties": {
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommentView"
+            }
+          }
+        }
+      },
+      "CommentResponse": {
+        "type": "object",
+        "description": "Single-comment create response.",
+        "required": [
+          "comment"
+        ],
+        "properties": {
+          "comment": {
+            "$ref": "#/components/schemas/CommentView"
+          }
+        }
+      },
+      "CommentView": {
+        "type": "object",
+        "description": "A single comment in a thread.",
+        "required": [
+          "id",
+          "post_id",
+          "author_id",
+          "body",
+          "created_at"
+        ],
+        "properties": {
+          "author_id": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "post_id": {
+            "type": "string"
+          }
+        }
+      },
+      "CommunityList": {
+        "type": "object",
+        "description": "Paged communities response.",
+        "required": [
+          "communities"
+        ],
+        "properties": {
+          "communities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommunityView"
+            }
+          }
+        }
+      },
+      "CommunityView": {
+        "type": "object",
+        "description": "Community card — the list and detail contract.",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "visibility",
+          "created_by",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "visibility": {
             "type": "string"
           }
         }
@@ -6187,6 +6334,112 @@
           }
         }
       },
+      "PostDetailResponse": {
+        "type": "object",
+        "description": "Wrapper for the single-post endpoint.",
+        "required": [
+          "post"
+        ],
+        "properties": {
+          "post": {
+            "$ref": "#/components/schemas/PostView"
+          }
+        }
+      },
+      "PostListItem": {
+        "type": "object",
+        "description": "A single post in a list page — the feed card contract.",
+        "required": [
+          "id",
+          "author_id",
+          "kind",
+          "title",
+          "slug",
+          "visibility",
+          "view_count",
+          "comment_count",
+          "reaction_count",
+          "bookmark_count",
+          "created_at"
+        ],
+        "properties": {
+          "author_id": {
+            "type": "string"
+          },
+          "bookmark_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "comment_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reaction_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "view_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "visibility": {
+            "type": "string"
+          }
+        }
+      },
+      "PostListPage": {
+        "type": "object",
+        "description": "Keyset page of posts.",
+        "required": [
+          "posts",
+          "limit"
+        ],
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "posts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostListItem"
+            }
+          }
+        }
+      },
       "PostQuery": {
         "type": "object",
         "properties": {
@@ -6213,6 +6466,73 @@
           "limit": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "PostView": {
+        "type": "object",
+        "description": "Full post — the reader view contract.",
+        "required": [
+          "id",
+          "author_id",
+          "kind",
+          "title",
+          "slug",
+          "body",
+          "status",
+          "visibility",
+          "view_count",
+          "created_at"
+        ],
+        "properties": {
+          "author_id": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "view_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "visibility": {
+            "type": "string"
           }
         }
       },
@@ -6505,6 +6825,39 @@
         "properties": {
           "role": {
             "type": "string"
+          }
+        }
+      },
+      "SignupRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "first_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "password": {
+            "type": "string"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

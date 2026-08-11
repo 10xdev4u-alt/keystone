@@ -370,7 +370,7 @@ pub async fn create_post(
     path = "/api/v1/posts/{id}",
     params(("id" = String, Path, description = "Post slug or UUID")),
     responses(
-        (status = 200, description = "Post with author, tags and stats", body = Value),
+        (status = 200, description = "Post with author, tags and stats", body = PostDetailResponse),
         (status = 404, description = "Post not found or not visible"),
     ),
     tag = "content"
@@ -394,6 +394,97 @@ pub async fn get_post(
     Ok(Json(json!({ "post": post_view(&post) })))
 }
 
+/// Full post — the reader view contract.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct PostView {
+    pub id: String,
+    pub author_id: String,
+    pub kind: String,
+    pub title: String,
+    pub slug: String,
+    pub body: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    pub status: String,
+    pub visibility: String,
+    pub view_count: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub published_at: Option<String>,
+    pub created_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+}
+
+/// Wrapper for the single-post endpoint.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct PostDetailResponse {
+    pub post: PostView,
+}
+
+/// A single comment in a thread.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct CommentView {
+    pub id: String,
+    pub post_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+    pub author_id: String,
+    pub body: String,
+    pub created_at: String,
+}
+
+/// Comment thread for a post.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct CommentList {
+    pub comments: Vec<CommentView>,
+}
+
+/// Single-comment create response.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct CommentResponse {
+    pub comment: CommentView,
+}
+
+fn comment_view(c: &keystone_db::repositories::comments::Comment) -> CommentView {
+    CommentView {
+        id: c.id.to_string(),
+        post_id: c.post_id.to_string(),
+        parent_id: c.parent_id.map(|p| p.to_string()),
+        author_id: c.author_id.to_string(),
+        body: c.body.clone(),
+        created_at: c.created_at.to_rfc3339(),
+    }
+}
+
+/// A single post in a list page — the feed card contract.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct PostListItem {
+    pub id: String,
+    pub author_id: String,
+    pub kind: String,
+    pub title: String,
+    pub slug: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    pub visibility: String,
+    pub view_count: i64,
+    pub comment_count: i64,
+    pub reaction_count: i64,
+    pub bookmark_count: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub published_at: Option<String>,
+    pub created_at: String,
+}
+
+/// Keyset page of posts.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct PostListPage {
+    pub posts: Vec<PostListItem>,
+    pub limit: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
+}
+
 /// List posts with keyset pagination (before cursor from `next_cursor`).
 #[utoipa::path(
     get,
@@ -405,7 +496,7 @@ pub async fn get_post(
         ("before" = Option<String>, Query, description = "Keyset cursor from the previous page"),
     ),
     responses(
-        (status = 200, description = "Page of posts + next_cursor", body = Value),
+        (status = 200, description = "Page of posts + next_cursor", body = PostListPage),
     ),
     tag = "content"
 )]
@@ -657,7 +748,7 @@ pub async fn record_view(
     request_body = CreateCommentRequest,
     params(("id" = Uuid, Path, description = "Post id")),
     responses(
-        (status = 201, description = "Comment created", body = Value),
+        (status = 201, description = "Comment created", body = CommentResponse),
         (status = 401, description = "Missing or invalid access token"),
         (status = 423, description = "Post is locked"),
         (status = 404, description = "Post not found"),
@@ -670,7 +761,7 @@ pub async fn create_comment(
     auth_user: AuthUser,
     Path(post_id): Path<Uuid>,
     Json(req): Json<CreateCommentRequest>,
-) -> ApiResult<(StatusCode, Json<Value>)> {
+) -> ApiResult<(StatusCode, Json<CommentResponse>)> {
     validate_text(&req.body, "comment body", COMMENT_MAX)?;
     // Locked discussions refuse new comments (423 Locked).
     let posts = Posts::new(state.pool.clone());
@@ -721,15 +812,9 @@ pub async fn create_comment(
     tracing::info!(comment_id = %comment.id, post_id = %post_id, "comment created");
     Ok((
         StatusCode::CREATED,
-        Json(json!({
-            "comment": {
-                "id": comment.id.to_string(),
-                "post_id": comment.post_id.to_string(),
-                "parent_id": comment.parent_id.map(|p| p.to_string()),
-                "body": comment.body,
-                "created_at": comment.created_at,
-            }
-        })),
+        Json(CommentResponse {
+            comment: comment_view(&comment),
+        }),
     ))
 }
 
@@ -739,33 +824,21 @@ pub async fn create_comment(
     path = "/api/v1/posts/{id}/comments",
     params(("id" = Uuid, Path, description = "Post id")),
     responses(
-        (status = 200, description = "Comment tree", body = Value),
+        (status = 200, description = "Comment tree", body = CommentList),
     ),
     tag = "content"
 )]
 pub async fn list_comments(
     State(state): State<AppState>,
     Path(post_id): Path<Uuid>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<CommentList>> {
     let comments = Comments::new(state.pool.clone());
     let rows = comments
         .list_by_post(post_id)
         .await
         .map_err(map_repo_error)?;
-    let items: Vec<Value> = rows
-        .into_iter()
-        .map(|c| {
-            json!({
-                "id": c.id.to_string(),
-                "post_id": c.post_id.to_string(),
-                "parent_id": c.parent_id.map(|p| p.to_string()),
-                "author_id": c.author_id.to_string(),
-                "body": c.body,
-                "created_at": c.created_at,
-            })
-        })
-        .collect();
-    Ok(Json(json!({ "comments": items })))
+    let items: Vec<CommentView> = rows.iter().map(comment_view).collect();
+    Ok(Json(CommentList { comments: items }))
 }
 
 #[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, comment_id = %id))]

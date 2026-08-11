@@ -1,0 +1,226 @@
+.post-page {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.post {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.post__top {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.post__kind {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  color: var(--color-kind-fg, #4b5563);
+  background: var(--color-kind-bg, #f3f4f6);
+}
+
+.post__kind[data-kind="article"] {
+  --color-kind-fg: #1d4ed8;
+  --color-kind-bg: #dbeafe;
+}
+
+.post__kind[data-kind="question"] {
+  --color-kind-fg: #047857;
+  --color-kind-bg: #d1fae5;
+}
+
+.post__kind[data-kind="poll"] {
+  --color-kind-fg: #7c3aed;
+  --color-kind-bg: #ede9fe;
+}
+
+.post__kind[data-kind="discussion"] {
+  --color-kind-fg: #b45309;
+  --color-kind-bg: #fef3c7;
+}
+
+.post__visibility {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #667);
+  text-transform: capitalize;
+}
+
+.post__title {
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.post__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.82rem;
+  color: var(--color-text-muted, #667);
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.post__body {
+  font-size: 1.02rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.post--skeleton .post__title {
+  height: 2rem;
+  width: 80%;
+}
+
+.post--skeleton .post__body {
+  height: 1rem;
+  width: 95%;
+}
+
+.post--skeleton .post__body--short {
+  width: 60%;
+}
+
+/* ── Comments ─────────────────────────────────────────────────────────────── */
+
+.comments {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.comments__heading {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.comments__loading {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 0;
+}
+
+.comments__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.comment {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-surface, #fff);
+}
+
+.comment__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+
+.comment__author {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.comment__time {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #667);
+}
+
+.comment__body {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.comment-form__label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.comment-form__input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  font-size: 0.94rem;
+  line-height: 1.5;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-surface, #fff);
+  color: inherit;
+  resize: vertical;
+}
+
+.comment-form__input:focus {
+  outline: 2px solid var(--color-focus, #6366f1);
+  outline-offset: 1px;
+}
+
+.comment-form__error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-danger, #dc2626);
+}
+
+.comment-form__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.comment-form__submit {
+  padding: 0.5rem 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-accent, #6366f1);
+  color: #fff;
+  cursor: pointer;
+}
+
+.comment-form__submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.comment-form__hint {
+  font-size: 0.9rem;
+  color: var(--color-text-muted, #667);
+}
+
+.comment-form__hint a {
+  color: var(--color-accent, #6366f1);
+  font-weight: 600;
+}

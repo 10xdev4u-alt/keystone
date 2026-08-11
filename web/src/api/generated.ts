@@ -2118,12 +2118,50 @@ export interface components {
             /** Format: uuid */
             answer_id: string;
         };
+        CareerAssessmentRequest: {
+            /** Format: uuid */
+            career_path_id: string;
+            notes?: string | null;
+            /** Format: int32 */
+            score: number;
+        };
         CareerPathRequest: {
             description?: string | null;
             title: string;
         };
         ClaimRequest: {
             domain: string;
+        };
+        /** @description Comment thread for a post. */
+        CommentList: {
+            comments: components["schemas"]["CommentView"][];
+        };
+        /** @description Single-comment create response. */
+        CommentResponse: {
+            comment: components["schemas"]["CommentView"];
+        };
+        /** @description A single comment in a thread. */
+        CommentView: {
+            author_id: string;
+            body: string;
+            created_at: string;
+            id: string;
+            parent_id?: string | null;
+            post_id: string;
+        };
+        /** @description Paged communities response. */
+        CommunityList: {
+            communities: components["schemas"]["CommunityView"][];
+        };
+        /** @description Community card — the list and detail contract. */
+        CommunityView: {
+            created_at: string;
+            created_by: string;
+            description?: string | null;
+            id: string;
+            name: string;
+            slug: string;
+            visibility: string;
         };
         CreateAnswerRequest: {
             body: string;
@@ -2279,6 +2317,37 @@ export interface components {
             /** Format: int64 */
             offset?: number;
         };
+        /** @description Wrapper for the single-post endpoint. */
+        PostDetailResponse: {
+            post: components["schemas"]["PostView"];
+        };
+        /** @description A single post in a list page — the feed card contract. */
+        PostListItem: {
+            author_id: string;
+            /** Format: int64 */
+            bookmark_count: number;
+            /** Format: int64 */
+            comment_count: number;
+            created_at: string;
+            id: string;
+            kind: string;
+            published_at?: string | null;
+            /** Format: int64 */
+            reaction_count: number;
+            slug: string;
+            summary?: string | null;
+            title: string;
+            /** Format: int64 */
+            view_count: number;
+            visibility: string;
+        };
+        /** @description Keyset page of posts. */
+        PostListPage: {
+            /** Format: int64 */
+            limit: number;
+            next_cursor?: string | null;
+            posts: components["schemas"]["PostListItem"][];
+        };
         PostQuery: {
             /** Format: uuid */
             author?: string | null;
@@ -2291,6 +2360,23 @@ export interface components {
             kind?: string | null;
             /** Format: int64 */
             limit?: number;
+        };
+        /** @description Full post — the reader view contract. */
+        PostView: {
+            author_id: string;
+            body: string;
+            created_at: string;
+            id: string;
+            kind: string;
+            published_at?: string | null;
+            slug: string;
+            status: string;
+            summary?: string | null;
+            title: string;
+            updated_at?: string | null;
+            /** Format: int64 */
+            view_count: number;
+            visibility: string;
         };
         PreferencesRequest: {
             digest?: boolean | null;
@@ -2373,6 +2459,13 @@ export interface components {
         };
         SetRoleRequest: {
             role: string;
+        };
+        SignupRequest: {
+            email: string;
+            first_name?: string | null;
+            last_name?: string | null;
+            password: string;
+            username?: string | null;
         };
         SkillRequest: {
             level: string;
@@ -2721,7 +2814,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RegisterRequest"];
+                "application/json": components["schemas"]["SignupRequest"];
             };
         };
         responses: {
@@ -3082,7 +3175,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CommunityList"];
                 };
             };
         };
@@ -4410,7 +4503,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AssessmentRequest"];
+                "application/json": components["schemas"]["CareerAssessmentRequest"];
             };
         };
         responses: {
@@ -5791,7 +5884,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PostListPage"];
                 };
             };
         };
@@ -5852,7 +5945,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PostDetailResponse"];
                 };
             };
             /** @description Post not found or not visible */
@@ -6186,7 +6279,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CommentList"];
                 };
             };
         };
@@ -6213,7 +6306,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CommentResponse"];
                 };
             };
             /** @description Missing or invalid access token */

@@ -20,6 +20,21 @@ const BASE_URL: string =
 let accessToken: string | null = null;
 let csrfToken: string | null = null;
 
+/**
+ * The `keystone_csrf` cookie is deliberately NOT httpOnly — the backend's
+ * double-submit contract requires the SPA to echo it back. After a page
+ * reload the in-memory token is gone, so reads fall back to the cookie.
+ */
+function readCsrfCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/(?:^|; )keystone_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function effectiveCsrf(): string | null {
+  return csrfToken ?? readCsrfCookie();
+}
+
 const authListeners = new Set<(authed: boolean) => void>();
 
 export function setTokens(access: string | null, csrf: string | null): void {
@@ -66,10 +81,11 @@ async function refreshSession(): Promise<boolean> {
   if (refreshing) return refreshing;
   refreshing = (async () => {
     try {
+      const csrf = effectiveCsrf();
       const res = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
         method: "POST",
         credentials: "include",
-        headers: csrfToken ? { "X-CSRF-Token": csrfToken } : {},
+        headers: csrf ? { "X-CSRF-Token": csrf } : {},
       });
       if (!res.ok) {
         setTokens(null, null);
@@ -93,21 +109,26 @@ const authMiddleware: Middleware = {
     if (accessToken) {
       request.headers.set("Authorization", `Bearer ${accessToken}`);
     }
-    if (csrfToken && !["GET", "HEAD", "OPTIONS"].includes(request.method)) {
-      request.headers.set("X-CSRF-Token", csrfToken);
+    const csrf = effectiveCsrf();
+    if (csrf && !["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+      request.headers.set("X-CSRF-Token", csrf);
     }
     return request;
   },
   async onResponse({ request, response }) {
-    // Refresh exactly once on 401, then replay the original request.
-    if (response.status === 401 && !request.url.includes("/auth/")) {
+    // Refresh exactly once on 401, then replay the original request. Only the
+    // refresh endpoint itself is excluded — /auth/me 401s (e.g. after a page
+    // reload wiped the in-memory token) must trigger the cookie refresh so a
+    // valid session is recovered. The `refreshing` guard bounds the retry.
+    if (response.status === 401 && !request.url.includes("/auth/refresh")) {
       if (await refreshSession()) {
         const retry = request.clone();
         if (accessToken) {
           retry.headers.set("Authorization", `Bearer ${accessToken}`);
         }
-        if (csrfToken) {
-          retry.headers.set("X-CSRF-Token", csrfToken);
+        const csrf = effectiveCsrf();
+        if (csrf) {
+          retry.headers.set("X-CSRF-Token", csrf);
         }
         return fetch(retry);
       }

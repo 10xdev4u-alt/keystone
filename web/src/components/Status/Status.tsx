@@ -11,10 +11,13 @@ export interface EmptyStateProps {
   title: string;
   description?: string;
   action?: ReactNode;
+  /** Heading level — list screens under an `h1` hero pass `2` to keep the tree ordered. */
+  headingLevel?: 2 | 3;
 }
 
 /** First-class empty state — every list screen must render one. */
-export function EmptyState({ title, description, action }: EmptyStateProps) {
+export function EmptyState({ title, description, action, headingLevel = 3 }: EmptyStateProps) {
+  const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
     <div className="status status--empty" role="status">
       <div className="status__icon" aria-hidden="true">
@@ -27,7 +30,7 @@ export function EmptyState({ title, description, action }: EmptyStateProps) {
           <path d="m6 6.5 2.5 2.5L6 11.5M10 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       </div>
-      <h3 className="status__title">{title}</h3>
+      <Heading className="status__title">{title}</Heading>
       {description && <p className="status__description">{description}</p>}
       {action && <div className="status__action">{action}</div>}
     </div>

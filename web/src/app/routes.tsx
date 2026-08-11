@@ -16,6 +16,25 @@ const Placeholder = lazy(() =>
   })),
 );
 
+const HomePage = lazy(() =>
+  import("../pages/HomePage").then((m) => ({ default: m.HomePage })),
+);
+const PostPage = lazy(() =>
+  import("../pages/PostPage").then((m) => ({ default: m.PostPage })),
+);
+const CommunitiesPage = lazy(() =>
+  import("../pages/CommunitiesPage").then((m) => ({ default: m.CommunitiesPage })),
+);
+const LoginPage = lazy(() =>
+  import("../pages/auth/LoginPage").then((m) => ({ default: m.LoginPage })),
+);
+const RegisterPage = lazy(() =>
+  import("../pages/auth/RegisterPage").then((m) => ({ default: m.RegisterPage })),
+);
+const VerifyPage = lazy(() =>
+  import("../pages/auth/VerifyPage").then((m) => ({ default: m.VerifyPage })),
+);
+
 function withSuspense(node: ReactNode): ReactNode {
   return (
     <Suspense
@@ -38,10 +57,10 @@ export const routesConfig: RouteObject[] = [
     element: <PublicLayout />,
     errorElement: <RouteErrorBoundary />,
     children: [
-      { path: "/", element: withSuspense(<Placeholder title="Home" />) },
-      { path: "/posts", element: withSuspense(<Placeholder title="Posts" />) },
-      { path: "/posts/:id", element: withSuspense(<Placeholder title="Post" />) },
-      { path: "/communities", element: withSuspense(<Placeholder title="Communities" />) },
+      { path: "/", element: withSuspense(<HomePage />) },
+      { path: "/posts", element: withSuspense(<HomePage />) },
+      { path: "/posts/:id", element: withSuspense(<PostPage />) },
+      { path: "/communities", element: withSuspense(<CommunitiesPage />) },
       { path: "/communities/:slug", element: withSuspense(<Placeholder title="Community" />) },
       { path: "/events", element: withSuspense(<Placeholder title="Events" />) },
       { path: "/events/:slug", element: withSuspense(<Placeholder title="Event" />) },
@@ -49,8 +68,9 @@ export const routesConfig: RouteObject[] = [
       { path: "/orgs/:slug", element: withSuspense(<Placeholder title="Organization" />) },
       { path: "/search", element: withSuspense(<Placeholder title="Search" />) },
       { path: "/courses", element: withSuspense(<Placeholder title="Courses" />) },
-      { path: "/login", element: withSuspense(<Placeholder title="Sign in" />) },
-      { path: "/register", element: withSuspense(<Placeholder title="Join Keystone" />) },
+      { path: "/login", element: withSuspense(<LoginPage />) },
+      { path: "/register", element: withSuspense(<RegisterPage />) },
+      { path: "/verify", element: withSuspense(<VerifyPage />) },
       { path: "*", element: <NotFound /> },
     ],
   },

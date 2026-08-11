@@ -16,12 +16,47 @@ import type { components, operations } from "./generated";
 
 type TokenResponse = components["schemas"]["TokenResponse"];
 type UserView = components["schemas"]["UserView"];
-type RegisterRequest = components["schemas"]["RegisterRequest"];
+type RegisterRequest = components["schemas"]["SignupRequest"];
 type LoginRequest = components["schemas"]["LoginRequest"];
+type PostListPage = components["schemas"]["PostListPage"];
+type PostDetailResponse = components["schemas"]["PostDetailResponse"];
+type CommentList = components["schemas"]["CommentList"];
+type CommentResponse = components["schemas"]["CommentResponse"];
+type CreateCommentRequest = components["schemas"]["CreateCommentRequest"];
+type CommunityList = components["schemas"]["CommunityList"];
+
+/**
+ * Caller-facing options for query wrapper hooks. The hook owns `queryKey` and
+ * `queryFn`; callers may pass any other option (staleTime, enabled, select,
+ * placeholderData, …) without satisfying the queryKey field.
+ */
+type QueryOptions<T> = Omit<UseQueryOptions<T, ApiRequestError>, "queryKey" | "queryFn">;
+
+// ── Content ──────────────────────────────────────────────────────────────────
+
+/** The homepage feed — newest posts first, keyset-paginated. */
+export function usePosts(
+  params: { kind?: string; limit?: number; before?: string } = {},
+  options?: QueryOptions<PostListPage>,
+) {
+  return useQuery({
+    queryKey: ["posts", params],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/posts", {
+        params: { query: params },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty posts response");
+      return data;
+    },
+    staleTime: 15_000,
+    ...options,
+  });
+}
 
 // ── Auth ────────────────────────────────────────────────────────────────────
 
-export function useCurrentUser(options?: UseQueryOptions<UserView, ApiRequestError>) {
+export function useCurrentUser(options?: QueryOptions<UserView>) {
   return useQuery({
     queryKey: ["auth", "me"],
     queryFn: async () => {
@@ -82,6 +117,20 @@ export function useRegister(
   });
 }
 
+export function useVerifyEmail(
+  options?: UseMutationOptions<void, ApiRequestError, { token: string }>,
+) {
+  return useMutation({
+    mutationFn: async ({ token }) => {
+      const { error } = await client.POST("/api/v1/auth/verify-email", {
+        body: { token },
+      });
+      if (error) throw error;
+    },
+    ...options,
+  });
+}
+
 export function useLogout(options?: UseMutationOptions<void, ApiRequestError, void>) {
   const qc = useQueryClient();
   const { onSuccess: userOnSuccess, ...rest } = options ?? {};
@@ -99,28 +148,10 @@ export function useLogout(options?: UseMutationOptions<void, ApiRequestError, vo
   });
 }
 
-// ── Content ─────────────────────────────────────────────────────────────────
-
-type ListPostsQuery = NonNullable<operations["list_posts"]["parameters"]["query"]>;
-
-export function usePosts(
-  query: ListPostsQuery = {},
-  options?: UseQueryOptions<unknown, ApiRequestError>,
-) {
-  return useQuery({
-    queryKey: ["posts", query],
-    queryFn: async () => {
-      const { data, error } = await client.GET("/api/v1/posts", { params: { query } });
-      if (error) throw error;
-      return data;
-    },
-    ...options,
-  });
-}
-
+/** Full post reader view — slug or UUID. */
 export function usePost(
   id: string,
-  options?: UseQueryOptions<unknown, ApiRequestError>,
+  options?: QueryOptions<PostDetailResponse>,
 ) {
   return useQuery({
     queryKey: ["posts", id],
@@ -129,10 +160,56 @@ export function usePost(
         params: { path: { id } },
       });
       if (error) throw error;
+      if (!data) throw new Error("Empty post response");
       return data;
     },
     enabled: Boolean(id),
+    staleTime: 30_000,
     ...options,
+  });
+}
+
+/** Comment thread for a post. */
+export function useComments(
+  postId: string,
+  options?: QueryOptions<CommentList>,
+) {
+  return useQuery({
+    queryKey: ["comments", postId],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/posts/{id}/comments", {
+        params: { path: { id: postId } },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty comments response");
+      return data;
+    },
+    enabled: Boolean(postId),
+    ...options,
+  });
+}
+
+export function useCreateComment(
+  postId: string,
+  options?: UseMutationOptions<CommentResponse, ApiRequestError, CreateCommentRequest>,
+) {
+  const qc = useQueryClient();
+  const { onSuccess: userOnSuccess, ...rest } = options ?? {};
+  return useMutation({
+    ...rest,
+    mutationFn: async (req) => {
+      const { data, error } = await client.POST("/api/v1/posts/{id}/comments", {
+        params: { path: { id: postId } },
+        body: req,
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty comment response");
+      return data;
+    },
+    onSuccess: (data, vars, ctx, mutation) => {
+      qc.invalidateQueries({ queryKey: ["comments", postId] });
+      userOnSuccess?.(data, vars, ctx, mutation);
+    },
   });
 }
 
@@ -140,7 +217,7 @@ export function usePost(
 
 export function useCommunities(
   query: operations["list_communities"]["parameters"]["query"] = {},
-  options?: UseQueryOptions<unknown, ApiRequestError>,
+  options?: QueryOptions<CommunityList>,
 ) {
   return useQuery({
     queryKey: ["communities", query],
@@ -149,8 +226,10 @@ export function useCommunities(
         params: { query },
       });
       if (error) throw error;
+      if (!data) throw new Error("Empty communities response");
       return data;
     },
+    staleTime: 30_000,
     ...options,
   });
 }
