@@ -31,6 +31,67 @@ fn spec_exposes_auth_paths() {
 }
 
 #[test]
+fn spec_exposes_content_social_qa_paths() {
+    let doc = doc();
+    let paths = doc["paths"].as_object().expect("paths object");
+    for route in [
+        "/api/v1/posts",
+        "/api/v1/posts/{id}",
+        "/api/v1/posts/{id}/versions",
+        "/api/v1/posts/{id}/view",
+        "/api/v1/posts/{id}/comments",
+        "/api/v1/comments/{id}",
+        "/api/v1/posts/{id}/reaction",
+        "/api/v1/posts/{id}/reactions",
+        "/api/v1/posts/{id}/bookmark",
+        "/api/v1/me/bookmarks",
+        "/api/v1/communities",
+        "/api/v1/communities/{slug}",
+        "/api/v1/communities/{slug}/join",
+        "/api/v1/communities/{slug}/leave",
+        "/api/v1/communities/{slug}/members",
+        "/api/v1/communities/{slug}/members/{member_id}",
+        "/api/v1/communities/{slug}/posts",
+        "/api/v1/communities/{slug}/posts/{post_id}",
+        "/api/v1/communities/{slug}/posts/{post_id}/pin",
+        "/api/v1/posts/{id}/poll",
+        "/api/v1/posts/{id}/poll/options",
+        "/api/v1/posts/{id}/poll/votes",
+        "/api/v1/posts/{id}/lock",
+        "/api/v1/posts/{id}/answers",
+        "/api/v1/answers/{id}/vote",
+        "/api/v1/posts/{id}/answers/{answer_id}/accept",
+        "/api/v1/posts/{id}/bounty",
+        "/api/v1/bounties/{id}/award",
+    ] {
+        assert!(paths.contains_key(route), "missing path {route}");
+    }
+}
+
+#[test]
+fn spec_tags_each_operation() {
+    let doc = doc();
+    let paths = doc["paths"].as_object().unwrap();
+    let mut tagged = 0;
+    for op in paths.values() {
+        for (method, operation) in op.as_object().unwrap() {
+            if method == "parameters" {
+                continue;
+            }
+            let tags = operation["tags"]
+                .as_array()
+                .expect("operation must be tagged");
+            assert!(!tags.is_empty(), "operation {method} untagged");
+            tagged += 1;
+        }
+    }
+    assert!(
+        tagged >= 40,
+        "expected >= 40 tagged operations, got {tagged}"
+    );
+}
+
+#[test]
 fn spec_declares_bearer_security_scheme() {
     let doc = doc();
     let schemes = doc["components"]["securitySchemes"]

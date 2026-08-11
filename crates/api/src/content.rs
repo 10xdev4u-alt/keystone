@@ -25,6 +25,7 @@ use keystone_db::repositories::tags::Tags;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::convert::Infallible;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 // ── Validation limits (content abuse controls) ─────────────────────────────
@@ -122,7 +123,7 @@ async fn unique_slug(
 
 // ── Request / response types ───────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreatePostRequest {
     pub kind: String,
     #[serde(default)]
@@ -141,7 +142,7 @@ fn default_visibility() -> String {
     "public".to_owned()
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdatePostRequest {
     #[serde(default)]
     pub title: Option<String>,
@@ -154,19 +155,19 @@ pub struct UpdatePostRequest {
     pub tags: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateCommentRequest {
     pub body: String,
     #[serde(default)]
     pub parent_id: Option<Uuid>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct SetReactionRequest {
     pub kind: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateReportRequest {
     pub entity_type: String,
     pub entity_id: Uuid,
@@ -175,12 +176,12 @@ pub struct CreateReportRequest {
     pub detail: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ResolveReportRequest {
     pub resolution_note: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpsertReviewRequest {
     pub entity_type: String,
     pub entity_id: Uuid,
@@ -191,7 +192,7 @@ pub struct UpsertReviewRequest {
     pub body: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct PostQuery {
     #[serde(default)]
     pub kind: Option<String>,
@@ -229,7 +230,7 @@ fn default_limit() -> i64 {
     20
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ReviewQuery {
     pub entity_type: String,
     pub entity_id: Uuid,
@@ -287,6 +288,19 @@ fn can_read(auth: Option<&AuthUser>, post: &keystone_db::repositories::posts::Po
 // ── Handlers: posts ────────────────────────────────────────────────────────
 
 #[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, kind = %req.kind))]
+/// Create a post (article / post / question / poll / discussion).
+#[utoipa::path(
+    post,
+    path = "/api/v1/posts",
+    request_body = CreatePostRequest,
+    responses(
+        (status = 201, description = "Post created", body = Value),
+        (status = 400, description = "Invalid kind, title or body"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "content"
+)]
 pub async fn create_post(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -349,6 +363,18 @@ pub async fn create_post(
     ))
 }
 
+/// Fetch a post by slug or UUID. Unlisted/private posts require the author
+/// or staff.
+#[utoipa::path(
+    get,
+    path = "/api/v1/posts/{id}",
+    params(("id" = String, Path, description = "Post slug or UUID")),
+    responses(
+        (status = 200, description = "Post with author, tags and stats", body = Value),
+        (status = 404, description = "Post not found or not visible"),
+    ),
+    tag = "content"
+)]
 pub async fn get_post(
     State(state): State<AppState>,
     maybe: MaybeUser,
@@ -368,6 +394,21 @@ pub async fn get_post(
     Ok(Json(json!({ "post": post_view(&post) })))
 }
 
+/// List posts with keyset pagination (before cursor from `next_cursor`).
+#[utoipa::path(
+    get,
+    path = "/api/v1/posts",
+    params(
+        ("kind" = Option<String>, Query, description = "Filter by post kind"),
+        ("author" = Option<Uuid>, Query, description = "Filter by author"),
+        ("limit" = Option<i64>, Query, description = "Page size (1..=50)"),
+        ("before" = Option<String>, Query, description = "Keyset cursor from the previous page"),
+    ),
+    responses(
+        (status = 200, description = "Page of posts + next_cursor", body = Value),
+    ),
+    tag = "content"
+)]
 pub async fn list_posts(
     State(state): State<AppState>,
     Query(query): Query<PostQuery>,
@@ -412,6 +453,21 @@ pub async fn list_posts(
 }
 
 #[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, post_id = %id))]
+/// Update a post. Owner or staff only; every edit writes a version row.
+#[utoipa::path(
+    patch,
+    path = "/api/v1/posts/{id}",
+    request_body = UpdatePostRequest,
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 200, description = "Updated post", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the author and not staff"),
+        (status = 404, description = "Post not found"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "content"
+)]
 pub async fn update_post(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -476,6 +532,20 @@ pub async fn update_post(
 }
 
 #[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, post_id = %id))]
+/// Soft-delete a post. Owner or staff only.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/posts/{id}",
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 204, description = "Post deleted"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the author and not staff"),
+        (status = 404, description = "Post not found"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "content"
+)]
 pub async fn delete_post(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -508,6 +578,20 @@ pub async fn delete_post(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// List a post's edit history (survives soft delete; owner or staff only).
+#[utoipa::path(
+    get,
+    path = "/api/v1/posts/{id}/versions",
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 200, description = "Version history", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the author and not staff"),
+        (status = 404, description = "Post not found"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "content"
+)]
 pub async fn post_versions(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -541,6 +625,16 @@ pub async fn post_versions(
     Ok(Json(json!({ "versions": items })))
 }
 
+/// Record a read for analytics. Best-effort; anonymous views count too.
+#[utoipa::path(
+    post,
+    path = "/api/v1/posts/{id}/view",
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 204, description = "View recorded"),
+    ),
+    tag = "content"
+)]
 pub async fn record_view(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -556,6 +650,21 @@ pub async fn record_view(
 // ── Handlers: comments ─────────────────────────────────────────────────────
 
 #[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, post_id = %post_id))]
+/// Add a comment to a post (threaded via `parent_id`). Locked posts refuse.
+#[utoipa::path(
+    post,
+    path = "/api/v1/posts/{id}/comments",
+    request_body = CreateCommentRequest,
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 201, description = "Comment created", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 423, description = "Post is locked"),
+        (status = 404, description = "Post not found"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "content"
+)]
 pub async fn create_comment(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -624,6 +733,16 @@ pub async fn create_comment(
     ))
 }
 
+/// List a post's comments (threaded).
+#[utoipa::path(
+    get,
+    path = "/api/v1/posts/{id}/comments",
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 200, description = "Comment tree", body = Value),
+    ),
+    tag = "content"
+)]
 pub async fn list_comments(
     State(state): State<AppState>,
     Path(post_id): Path<Uuid>,
@@ -650,6 +769,20 @@ pub async fn list_comments(
 }
 
 #[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, comment_id = %id))]
+/// Delete a comment. Owner or staff only.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/comments/{id}",
+    params(("id" = Uuid, Path, description = "Comment id")),
+    responses(
+        (status = 204, description = "Comment deleted"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the author and not staff"),
+        (status = 404, description = "Comment not found"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "content"
+)]
 pub async fn delete_comment(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -685,6 +818,19 @@ pub async fn delete_comment(
 // ── Handlers: reactions ────────────────────────────────────────────────────
 
 #[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, post_id = %post_id))]
+/// Set (upsert) a reaction on a post.
+#[utoipa::path(
+    put,
+    path = "/api/v1/posts/{id}/reaction",
+    request_body = SetReactionRequest,
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 200, description = "Reaction counts", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "content"
+)]
 pub async fn set_reaction(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -735,6 +881,18 @@ pub async fn set_reaction(
 }
 
 #[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, post_id = %post_id))]
+/// Remove the caller's reaction from a post.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/posts/{id}/reaction",
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 204, description = "Reaction removed"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "content"
+)]
 pub async fn remove_reaction(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -749,6 +907,16 @@ pub async fn remove_reaction(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Reaction breakdown for a post.
+#[utoipa::path(
+    get,
+    path = "/api/v1/posts/{id}/reactions",
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 200, description = "Reaction counts + caller state", body = Value),
+    ),
+    tag = "content"
+)]
 pub async fn get_reactions(
     State(state): State<AppState>,
     maybe: MaybeUser,
@@ -789,6 +957,18 @@ pub async fn get_reactions(
 // ── Handlers: bookmarks ────────────────────────────────────────────────────
 
 #[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, post_id = %post_id))]
+/// Bookmark a post for the current user.
+#[utoipa::path(
+    put,
+    path = "/api/v1/posts/{id}/bookmark",
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 204, description = "Bookmarked"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "content"
+)]
 pub async fn add_bookmark(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -804,6 +984,18 @@ pub async fn add_bookmark(
 }
 
 #[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, post_id = %post_id))]
+/// Remove a bookmark.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/posts/{id}/bookmark",
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 204, description = "Bookmark removed"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "content"
+)]
 pub async fn remove_bookmark(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -818,6 +1010,17 @@ pub async fn remove_bookmark(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// List the current user's bookmarked posts.
+#[utoipa::path(
+    get,
+    path = "/api/v1/me/bookmarks",
+    responses(
+        (status = 200, description = "Bookmarked posts", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "content"
+)]
 pub async fn my_bookmarks(
     State(state): State<AppState>,
     auth_user: AuthUser,
