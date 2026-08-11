@@ -92,7 +92,13 @@ export function SearchPage() {
                     {hit.entity_type}
                   </span>
                   <span className="search-hit__title">{hit.title}</span>
-                  {hit.snippet && <span className="search-hit__snippet">{hit.snippet}</span>}
+                  {hit.snippet && (
+                    <span className="search-hit__snippet">
+                      {/* ts_headline returns <b> markup — render as plain text,
+                          never as HTML (defense in depth against XSS). */}
+                      {hit.snippet.replace(/<[^>]+>/g, "")}
+                    </span>
+                  )}
                 </Link>
               </li>
             ))}
