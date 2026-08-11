@@ -30,6 +30,7 @@ use sqlx::PgPool;
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
+use utoipa::ToSchema;
 
 /// Single source of truth for the refresh cookie name (the HrX `accessToken`
 /// vs `access_token` drift exists precisely because this was duplicated).
@@ -49,7 +50,7 @@ pub struct AuthServices {
 
 // ── Request / response types ────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RegisterRequest {
     pub email: String,
     pub password: String,
@@ -61,18 +62,18 @@ pub struct RegisterRequest {
     pub username: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct VerifyEmailRequest {
     pub token: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct LoginRequest {
     pub email: String,
     pub password: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct UserView {
     pub id: String,
     pub email: String,
@@ -82,7 +83,7 @@ pub struct UserView {
     pub is_verified: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct TokenResponse {
     pub access_token: String,
     pub token_type: &'static str,
@@ -162,6 +163,19 @@ impl FromRequestParts<AppState> for AuthUser {
 
 // ── Handlers ────────────────────────────────────────────────────────────────
 
+/// Register a new account. Returns tokens plus a verification email token
+/// (dev flow: the raw token is returned; the mailer milestone emails it).
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/register",
+    request_body = RegisterRequest,
+    responses(
+        (status = 201, description = "Account created; tokens returned", body = TokenResponse),
+        (status = 400, description = "Invalid email, password or username"),
+        (status = 409, description = "Email or username already registered"),
+    ),
+    tag = "auth"
+)]
 pub async fn register(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -224,6 +238,17 @@ pub async fn register(
         .into_response())
 }
 
+/// Confirm the email verification token.
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/verify-email",
+    request_body = VerifyEmailRequest,
+    responses(
+        (status = 200, description = "Email verified"),
+        (status = 400, description = "Invalid or expired verification token"),
+    ),
+    tag = "auth"
+)]
 pub async fn verify_email(
     State(state): State<AppState>,
     Json(req): Json<VerifyEmailRequest>,
@@ -267,6 +292,18 @@ pub async fn verify_email(
     Ok(Json(json!({ "status": "verified" })).into_response())
 }
 
+/// Authenticate with email + password. Sets the httpOnly refresh cookie and
+/// returns the access token. Errors are deliberately generic (no enumeration).
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/login",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Authenticated; refresh cookie set", body = TokenResponse),
+        (status = 401, description = "Invalid credentials or account locked"),
+    ),
+    tag = "auth"
+)]
 pub async fn login(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -353,6 +390,17 @@ pub async fn login(
     issue_session(&state, user.id, &user.role, &headers).await
 }
 
+/// Rotate the refresh session and return a fresh token pair. The old session
+/// is revoked; replaying it revokes the whole family (reuse detection).
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/refresh",
+    responses(
+        (status = 200, description = "Rotated token pair", body = TokenResponse),
+        (status = 401, description = "Missing/invalid refresh cookie, or reuse detected"),
+    ),
+    tag = "auth"
+)]
 pub async fn refresh(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
     let token = read_refresh_cookie(&headers).ok_or(ApiError::Unauthorized)?;
     let hash = tokens::hash_refresh_token(&token);
@@ -438,6 +486,15 @@ pub async fn refresh(State(state): State<AppState>, headers: HeaderMap) -> ApiRe
     Err(ApiError::Unauthorized)
 }
 
+/// Revoke the refresh session family and clear the refresh cookie.
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/logout",
+    responses(
+        (status = 204, description = "Session family revoked; cookie cleared"),
+    ),
+    tag = "auth"
+)]
 pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
     if let Some(token) = read_refresh_cookie(&headers) {
         let hash = tokens::hash_refresh_token(&token);
@@ -471,6 +528,17 @@ pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> ApiRes
     Ok(response)
 }
 
+/// Current authenticated user.
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/me",
+    responses(
+        (status = 200, description = "Current user", body = UserView),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "auth"
+)]
 pub async fn me(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -495,6 +563,17 @@ pub async fn me(
 
 /// List the authenticated user's live sessions; the one matching the current
 /// refresh cookie is marked `current`.
+/// List live sessions for the current user (marks the current one).
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/sessions",
+    responses(
+        (status = 200, description = "Live sessions"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "auth"
+)]
 pub async fn list_sessions(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -526,6 +605,19 @@ pub async fn list_sessions(
 
 /// Revoke one session. Ownership is enforced: another user's session id
 /// answers 404, never revealing its existence.
+/// Revoke one session. Ownership enforced: another user's session id 404s.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/auth/sessions/{id}",
+    params(("id" = uuid::Uuid, Path, description = "Session id")),
+    responses(
+        (status = 204, description = "Session revoked"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 404, description = "Session not found or not owned by the user"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "auth"
+)]
 pub async fn revoke_session(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -553,6 +645,17 @@ pub async fn revoke_session(
 }
 
 /// Revoke all live sessions for the authenticated user.
+/// Revoke all live sessions for the current user.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/auth/sessions",
+    responses(
+        (status = 204, description = "All sessions revoked"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "auth"
+)]
 pub async fn revoke_all_sessions(
     State(state): State<AppState>,
     headers: HeaderMap,

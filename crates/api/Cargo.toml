@@ -33,6 +33,9 @@ base64.workspace = true
 getrandom.workspace = true
 hex.workspace = true
 sha2.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+utoipa-swagger-ui.workspace = true
 
 [dev-dependencies]
 keystone-db = { path = "../db", features = ["test-util"] }
