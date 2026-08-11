@@ -26,6 +26,61 @@ use std::time::{Duration, Instant};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+/// A conversation as listed for the caller.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct ConversationView {
+    pub id: String,
+    pub r#type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    pub created_at: String,
+    pub last_message_at: Option<String>,
+    pub last_message: Option<String>,
+    pub unread: i64,
+}
+
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct ConversationListResponse {
+    pub conversations: Vec<ConversationView>,
+}
+
+/// A single chat message.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct MessageView {
+    pub id: String,
+    pub conversation_id: String,
+    pub sender_id: String,
+    pub body: String,
+    pub sent_at: String,
+    pub delivered_at: Option<String>,
+    pub read_at: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct MessageListResponse {
+    pub messages: Vec<MessageView>,
+}
+
+/// Create / send responses carry the new row.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct SendMessageResponse {
+    pub message: MessageView,
+}
+
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct ConversationResponse {
+    pub conversation: ConversationRef,
+}
+
+/// Minimal conversation reference (create/fetch by other user).
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct ConversationRef {
+    pub id: String,
+    pub r#type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+}
+
 /// Sliding-window rate gate for WS message sends.
 #[derive(Debug)]
 pub struct MessageGate {
@@ -78,7 +133,7 @@ pub struct CreateConversationRequest {
     path = "/api/v1/conversations",
     request_body = CreateConversationRequest,
     responses(
-        (status = 201, description = "Conversation created or existing", body = Value),
+        (status = 201, description = "Conversation created or existing", body = ConversationResponse),
         (status = 401, description = "Missing or invalid access token"),
     ),
     security(("bearer_auth" = [])),
@@ -125,13 +180,13 @@ pub async fn create_conversation(
     };
     Ok((
         status,
-        Json(json!({
-            "conversation": {
-                "id": conversation.id.to_string(),
-                "type": conversation.kind,
-                "title": conversation.title,
-            }
-        })),
+        Json(ConversationResponse {
+            conversation: ConversationRef {
+                id: conversation.id.to_string(),
+                r#type: conversation.kind,
+                title: conversation.title,
+            },
+        }),
     )
         .into_response())
 }
@@ -141,7 +196,7 @@ pub async fn create_conversation(
     get,
     path = "/api/v1/conversations",
     responses(
-        (status = 200, description = "Conversations", body = Value),
+        (status = 200, description = "Conversations", body = ConversationListResponse),
         (status = 401, description = "Missing or invalid access token"),
     ),
     security(("bearer_auth" = [])),
@@ -150,27 +205,27 @@ pub async fn create_conversation(
 pub async fn list_conversations(
     State(state): State<AppState>,
     user: AuthUser,
-) -> Result<Json<JsonValue>, ApiError> {
+) -> Result<Json<ConversationListResponse>, ApiError> {
     let chat = Chat::new(state.pool.clone());
     let rows = chat
         .list_for_user(user.user_id)
         .await
         .map_err(map_repo_error)?;
-    let items: Vec<JsonValue> = rows
+    let items: Vec<ConversationView> = rows
         .into_iter()
-        .map(|c| {
-            json!({
-                "id": c.id.to_string(),
-                "type": c.kind,
-                "title": c.title,
-                "created_at": c.created_at,
-                "last_message_at": c.last_message_at,
-                "last_message": c.last_message,
-                "unread": c.unread,
-            })
+        .map(|c| ConversationView {
+            id: c.id.to_string(),
+            r#type: c.kind,
+            title: c.title,
+            created_at: c.created_at.to_rfc3339(),
+            last_message_at: Some(c.last_message_at.to_rfc3339()),
+            last_message: c.last_message,
+            unread: c.unread,
         })
         .collect();
-    Ok(Json(json!({ "conversations": items })))
+    Ok(Json(ConversationListResponse {
+        conversations: items,
+    }))
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -185,7 +240,7 @@ pub struct MessagesQuery {
     path = "/api/v1/conversations/{id}/messages",
     params(("id" = Uuid, Path, description = "Conversation id")),
     responses(
-        (status = 200, description = "Messages", body = Value),
+        (status = 200, description = "Messages", body = MessageListResponse),
         (status = 401, description = "Missing or invalid access token"),
     ),
     security(("bearer_auth" = [])),
@@ -196,7 +251,7 @@ pub async fn list_messages(
     user: AuthUser,
     Path(conversation_id): Path<Uuid>,
     Query(q): Query<MessagesQuery>,
-) -> Result<Json<JsonValue>, ApiError> {
+) -> Result<Json<MessageListResponse>, ApiError> {
     let chat = Chat::new(state.pool.clone());
     let rows = chat
         .list_messages(
@@ -207,21 +262,19 @@ pub async fn list_messages(
         )
         .await
         .map_err(map_repo_error)?;
-    let items: Vec<JsonValue> = rows
+    let items: Vec<MessageView> = rows
         .into_iter()
-        .map(|m| {
-            json!({
-                "id": m.id.to_string(),
-                "conversation_id": m.conversation_id.to_string(),
-                "sender_id": m.sender_id.to_string(),
-                "body": m.body,
-                "sent_at": m.sent_at,
-                "delivered_at": m.delivered_at,
-                "read_at": m.read_at,
-            })
+        .map(|m| MessageView {
+            id: m.id.to_string(),
+            conversation_id: m.conversation_id.to_string(),
+            sender_id: m.sender_id.to_string(),
+            body: m.body,
+            sent_at: m.sent_at.to_rfc3339(),
+            delivered_at: m.delivered_at.map(|t| t.to_rfc3339()),
+            read_at: m.read_at.map(|t| t.to_rfc3339()),
         })
         .collect();
-    Ok(Json(json!({ "messages": items })))
+    Ok(Json(MessageListResponse { messages: items }))
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -238,7 +291,7 @@ pub struct SendMessageRequest {
     request_body = SendMessageRequest,
     params(("id" = Uuid, Path, description = "Conversation id")),
     responses(
-        (status = 201, description = "Message sent", body = Value),
+        (status = 201, description = "Message sent", body = SendMessageResponse),
         (status = 401, description = "Missing or invalid access token"),
     ),
     security(("bearer_auth" = [])),
@@ -258,15 +311,17 @@ pub async fn send_message(
     fan_out_message(&state, &chat, &message, user.user_id).await;
     Ok((
         axum::http::StatusCode::CREATED,
-        Json(json!({
-            "message": {
-                "id": message.id.to_string(),
-                "conversation_id": message.conversation_id.to_string(),
-                "sender_id": message.sender_id.to_string(),
-                "body": message.body,
-                "sent_at": message.sent_at,
-            }
-        })),
+        Json(SendMessageResponse {
+            message: MessageView {
+                id: message.id.to_string(),
+                conversation_id: message.conversation_id.to_string(),
+                sender_id: message.sender_id.to_string(),
+                body: message.body,
+                sent_at: message.sent_at.to_rfc3339(),
+                delivered_at: None,
+                read_at: None,
+            },
+        }),
     )
         .into_response())
 }

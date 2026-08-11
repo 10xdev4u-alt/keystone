@@ -2340,6 +2340,29 @@ export interface components {
             slug: string;
             visibility: string;
         };
+        ConversationListResponse: {
+            conversations: components["schemas"]["ConversationView"][];
+        };
+        /** @description Minimal conversation reference (create/fetch by other user). */
+        ConversationRef: {
+            id: string;
+            title?: string | null;
+            type: string;
+        };
+        ConversationResponse: {
+            conversation: components["schemas"]["ConversationRef"];
+        };
+        /** @description A conversation as listed for the caller. */
+        ConversationView: {
+            created_at: string;
+            id: string;
+            last_message?: string | null;
+            last_message_at?: string | null;
+            title?: string | null;
+            type: string;
+            /** Format: int64 */
+            unread: number;
+        };
         CreateAnswerRequest: {
             body: string;
         };
@@ -2540,6 +2563,19 @@ export interface components {
         };
         MentorshipRequest: {
             message?: string | null;
+        };
+        MessageListResponse: {
+            messages: components["schemas"]["MessageView"][];
+        };
+        /** @description A single chat message. */
+        MessageView: {
+            body: string;
+            conversation_id: string;
+            delivered_at?: string | null;
+            id: string;
+            read_at?: string | null;
+            sender_id: string;
+            sent_at: string;
         };
         MessagesQuery: {
             /** Format: date-time */
@@ -2823,6 +2859,10 @@ export interface components {
         };
         SendMessageRequest: {
             body: string;
+        };
+        /** @description Create / send responses carry the new row. */
+        SendMessageResponse: {
+            message: components["schemas"]["MessageView"];
         };
         /** @description Wrapper for the sessions list endpoint. */
         SessionListResponse: {
@@ -4151,7 +4191,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ConversationListResponse"];
                 };
             };
             /** @description Missing or invalid access token */
@@ -4182,7 +4222,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ConversationResponse"];
                 };
             };
             /** @description Missing or invalid access token */
@@ -4212,7 +4252,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MessageListResponse"];
                 };
             };
             /** @description Missing or invalid access token */
@@ -4246,7 +4286,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["SendMessageResponse"];
                 };
             };
             /** @description Missing or invalid access token */

@@ -29,6 +29,20 @@ vi.mock("../api/hooks", () => ({
     refetch: vi.fn(),
   })),
   useCreatePost: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
+  useConversations: vi.fn(() => ({
+    data: { conversations: [] },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+  useMessages: vi.fn(() => ({ data: { messages: [] }, isLoading: false, isError: false })),
+  useSendMessage: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useCreateConversation: vi.fn(() => ({
+    mutate: vi.fn(),
+    isPending: false,
+    error: null,
+  })),
   useEvents: vi.fn(() => ({
     data: { events: [] },
     isLoading: false,
