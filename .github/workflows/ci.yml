@@ -121,6 +121,48 @@ jobs:
             exit 1
           fi
 
+  e2e:
+    name: E2E · Playwright smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: keystone
+          POSTGRES_PASSWORD: keystone_test
+          POSTGRES_DB: keystone_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U keystone"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install web deps
+        working-directory: web
+        run: npm ci
+      - name: Install Playwright browsers
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: Build API
+        run: cargo build --all-features
+      - name: Run e2e smoke suite
+        working-directory: web
+        env:
+          # Matches the postgres service container above.
+          E2E_DATABASE_URL: postgres://keystone:keystone_test@localhost:5432/keystone_test
+        run: npm run test:e2e
+
   security-grep:
     name: Secrets-in-logs guard
     runs-on: ubuntu-latest
