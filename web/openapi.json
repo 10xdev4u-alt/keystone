@@ -6973,6 +6973,7 @@
           "title",
           "slug",
           "body",
+          "body_html",
           "status",
           "visibility",
           "view_count",
@@ -6984,6 +6985,10 @@
           },
           "body": {
             "type": "string"
+          },
+          "body_html": {
+            "type": "string",
+            "description": "Markdown rendered to sanitized HTML server-side (see `keystone_db::markdown`)."
           },
           "created_at": {
             "type": "string"

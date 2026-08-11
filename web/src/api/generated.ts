@@ -2532,6 +2532,8 @@ export interface components {
         PostView: {
             author_id: string;
             body: string;
+            /** @description Markdown rendered to sanitized HTML server-side (see `keystone_db::markdown`). */
+            body_html: string;
             created_at: string;
             id: string;
             kind: string;

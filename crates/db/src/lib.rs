@@ -5,6 +5,7 @@
 
 pub mod event_bus;
 pub mod jobs;
+pub mod markdown;
 pub mod search;
 pub mod storage;
 

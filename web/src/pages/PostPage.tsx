@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import DOMPurify from "dompurify";
 import { Link, useParams } from "react-router-dom";
 import {
   useComments,
@@ -22,6 +23,64 @@ function timeAgo(iso: string): string {
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d ago`;
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function slugifyHeading(text: string): string {
+  return (
+    text
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\u00e0-\u00ff]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "section"
+  );
+}
+
+/**
+ * Editorial body renderer. The backend already sanitizes on write; this
+ * re-sanitizes with DOMPurify (defense-in-depth) and derives a table of
+ * contents from the h2/h3 headings — anchors assigned client-side because
+ * pulldown-cmark only emits ids with explicit `{#id}` attributes.
+ */
+function RichText({ html }: { html: string }) {
+  const { clean, toc } = useMemo(() => {
+    const clean = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+    const doc = new DOMParser().parseFromString(clean, "text/html");
+    const toc: { id: string; text: string; level: 2 | 3 }[] = [];
+    doc.querySelectorAll("h2, h3").forEach((el) => {
+      const text = el.textContent ?? "";
+      if (!text.trim()) return;
+      const id = slugifyHeading(text);
+      el.id = id;
+      toc.push({ id, text, level: el.tagName === "H2" ? 2 : 3 });
+    });
+    return { clean: doc.body.innerHTML, toc };
+  }, [html]);
+
+  if (!clean) return null;
+
+  return (
+    <>
+      {toc.length > 1 && (
+        <nav className="post__toc" aria-label="Table of contents">
+          <p className="post__toc-title">On this page</p>
+          <ol className="post__toc-list">
+            {toc.map((h) => (
+              <li key={h.id} data-level={h.level}>
+                <a href={`#${h.id}`}>{h.text}</a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      )}
+      <div
+        className="post__body post__body--rich"
+        // The HTML is sanitized server-side and re-sanitized above; the TOC
+        // anchors are generated from the same document.
+        dangerouslySetInnerHTML={{ __html: clean }}
+      />
+    </>
+  );
 }
 
 /** Sticky reading-progress bar — fills as the reader scrolls the article. */
@@ -164,7 +223,7 @@ export function PostPage() {
               <span>by {post.author_id.slice(0, 8)}</span>
               <ShareActions title={post.title} url={window.location.href} />
             </div>
-            <div className="post__body">{post.body}</div>
+            <RichText html={post.body_html ?? ""} />
           </article>
 
           <section className="comments" aria-labelledby="comments-heading">
