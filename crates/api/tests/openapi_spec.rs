@@ -199,7 +199,7 @@ fn spec_documents_request_and_response_schemas() {
     let doc = doc();
     let schemas = doc["components"]["schemas"].as_object().expect("schemas");
     for schema in [
-        "RegisterRequest",
+        "SignupRequest",
         "LoginRequest",
         "VerifyEmailRequest",
         "UserView",

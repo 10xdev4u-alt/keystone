@@ -51,7 +51,7 @@ pub struct AuthServices {
 // ── Request / response types ────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, ToSchema)]
-pub struct RegisterRequest {
+pub struct SignupRequest {
     pub email: String,
     pub password: String,
     #[serde(default)]
@@ -168,7 +168,7 @@ impl FromRequestParts<AppState> for AuthUser {
 #[utoipa::path(
     post,
     path = "/api/v1/auth/register",
-    request_body = RegisterRequest,
+    request_body = SignupRequest,
     responses(
         (status = 201, description = "Account created; tokens returned", body = TokenResponse),
         (status = 400, description = "Invalid email, password or username"),
@@ -179,7 +179,7 @@ impl FromRequestParts<AppState> for AuthUser {
 pub async fn register(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(req): Json<RegisterRequest>,
+    Json(req): Json<SignupRequest>,
 ) -> ApiResult<Response> {
     keystone_auth::email::validate(&req.email).map_err(|e| ApiError::BadRequest(e.into()))?;
     keystone_auth::password::validate(&req.password)

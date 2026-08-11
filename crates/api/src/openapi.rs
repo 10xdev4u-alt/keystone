@@ -171,7 +171,7 @@ use utoipa::{Modify, OpenApi};
         crate::moderation::list_reviews,
     ),
     components(schemas(
-        crate::auth::RegisterRequest,
+        crate::auth::SignupRequest,
         crate::auth::VerifyEmailRequest,
         crate::auth::LoginRequest,
         crate::auth::UserView,
@@ -210,7 +210,7 @@ use utoipa::{Modify, OpenApi};
         crate::careers_api::AlertRequest,
         crate::careers_api::CareerPathRequest,
         crate::careers_api::StepRequest,
-        crate::careers_api::AssessmentRequest,
+        crate::careers_api::CareerAssessmentRequest,
         crate::learning_api::CreateCourseRequest,
         crate::learning_api::ModuleRequest,
         crate::learning_api::LessonRequest,
