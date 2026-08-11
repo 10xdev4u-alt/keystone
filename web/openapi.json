@@ -1655,7 +1655,9 @@
             "description": "Courses page",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CourseListResponse"
+                }
               }
             }
           }
@@ -1720,7 +1722,9 @@
             "description": "Course with modules/lessons",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CourseDetailResponse"
+                }
               }
             }
           },
@@ -6374,6 +6378,77 @@
           }
         }
       },
+      "CourseDetailResponse": {
+        "type": "object",
+        "description": "Full course detail: the course plus its module tree.",
+        "required": [
+          "course",
+          "modules"
+        ],
+        "properties": {
+          "course": {
+            "$ref": "#/components/schemas/CourseView"
+          },
+          "modules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModuleView"
+            }
+          }
+        }
+      },
+      "CourseListResponse": {
+        "type": "object",
+        "required": [
+          "courses"
+        ],
+        "properties": {
+          "courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CourseView"
+            }
+          }
+        }
+      },
+      "CourseView": {
+        "type": "object",
+        "description": "Course card / detail — the list contract.",
+        "required": [
+          "id",
+          "author_id",
+          "title",
+          "slug",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "author_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
       "CreateAnswerRequest": {
         "type": "object",
         "required": [
@@ -6978,6 +7053,34 @@
           }
         }
       },
+      "LessonView": {
+        "type": "object",
+        "description": "One lesson inside a course module.",
+        "required": [
+          "id",
+          "position",
+          "title"
+        ],
+        "properties": {
+          "duration_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
       "ListParams": {
         "type": "object",
         "properties": {
@@ -7202,6 +7305,34 @@
           "title"
         ],
         "properties": {
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "ModuleView": {
+        "type": "object",
+        "description": "One module (chapter) of a course.",
+        "required": [
+          "id",
+          "position",
+          "title",
+          "lessons"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "lessons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LessonView"
+            }
+          },
           "position": {
             "type": "integer",
             "format": "int32"

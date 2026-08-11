@@ -134,21 +134,21 @@ pub async fn create_course(
         ("offset" = Option<i64>, Query, description = "Page offset"),
     ),
     responses(
-        (status = 200, description = "Courses page", body = Value),
+        (status = 200, description = "Courses page", body = CourseListResponse),
     ),
     tag = "learning"
 )]
 pub async fn list_courses(
     State(state): State<AppState>,
     Query(query): Query<PageQuery>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<CourseListResponse>> {
     let learning = Learning::new(state.pool.clone());
     let rows = learning
         .published_courses(query.limit.clamp(1, 50), query.offset.max(0))
         .await
         .map_err(map_repo_error)?;
-    let items: Vec<Value> = rows.iter().map(course_json).collect();
-    Ok(Json(json!({ "courses": items })))
+    let items: Vec<CourseView> = rows.iter().map(course_json).collect();
+    Ok(Json(CourseListResponse { courses: items }))
 }
 
 /// Fetch a course by slug with its module tree.
@@ -157,7 +157,7 @@ pub async fn list_courses(
     path = "/api/v1/courses/{slug}",
     params(("slug" = String, Path, description = "Course slug")),
     responses(
-        (status = 200, description = "Course with modules/lessons", body = Value),
+        (status = 200, description = "Course with modules/lessons", body = CourseDetailResponse),
         (status = 404, description = "Course not found"),
     ),
     tag = "learning"
@@ -165,7 +165,7 @@ pub async fn list_courses(
 pub async fn get_course(
     State(state): State<AppState>,
     Path(slug): Path<String>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<CourseDetailResponse>> {
     let learning = Learning::new(state.pool.clone());
     let course = learning
         .get_course_by_slug(&slug)
@@ -176,21 +176,25 @@ pub async fn get_course(
     let mut module_tree = Vec::new();
     for module in modules {
         let lessons = learning.lessons(module.id).await.map_err(map_repo_error)?;
-        module_tree.push(json!({
-            "id": module.id.to_string(),
-            "position": module.position,
-            "title": module.title,
-            "lessons": lessons.iter().map(|l| json!({
-                "id": l.id.to_string(),
-                "position": l.position,
-                "title": l.title,
-                "duration_seconds": l.duration_seconds,
-            })).collect::<Vec<_>>(),
-        }));
+        module_tree.push(ModuleView {
+            id: module.id.to_string(),
+            position: module.position,
+            title: module.title,
+            lessons: lessons
+                .iter()
+                .map(|l| LessonView {
+                    id: l.id.to_string(),
+                    position: l.position,
+                    title: l.title.clone(),
+                    duration_seconds: l.duration_seconds,
+                })
+                .collect(),
+        });
     }
-    Ok(Json(
-        json!({ "course": course_json(&course), "modules": module_tree }),
-    ))
+    Ok(Json(CourseDetailResponse {
+        course: course_json(&course),
+        modules: module_tree,
+    }))
 }
 
 /// Publish — the course author or platform staff.
@@ -1326,16 +1330,58 @@ pub async fn add_speaker(
     Ok(StatusCode::NO_CONTENT)
 }
 
-fn course_json(course: &keystone_db::repositories::learning::Course) -> Value {
-    json!({
-        "id": course.id.to_string(),
-        "author_id": course.author_id.to_string(),
-        "title": course.title,
-        "slug": course.slug,
-        "description": course.description,
-        "status": course.status,
-        "created_at": course.created_at,
-    })
+/// Course card / detail — the list contract.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct CourseView {
+    pub id: String,
+    pub author_id: String,
+    pub title: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub status: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct CourseListResponse {
+    pub courses: Vec<CourseView>,
+}
+
+/// One lesson inside a course module.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct LessonView {
+    pub id: String,
+    pub position: i32,
+    pub title: String,
+    pub duration_seconds: Option<i32>,
+}
+
+/// One module (chapter) of a course.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct ModuleView {
+    pub id: String,
+    pub position: i32,
+    pub title: String,
+    pub lessons: Vec<LessonView>,
+}
+
+/// Full course detail: the course plus its module tree.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct CourseDetailResponse {
+    pub course: CourseView,
+    pub modules: Vec<ModuleView>,
+}
+
+fn course_json(course: &keystone_db::repositories::learning::Course) -> CourseView {
+    CourseView {
+        id: course.id.to_string(),
+        author_id: course.author_id.to_string(),
+        title: course.title.clone(),
+        slug: course.slug.clone(),
+        description: course.description.clone(),
+        status: course.status.clone(),
+        created_at: course.created_at.to_rfc3339(),
+    }
 }
 
 /// Event card — the list contract.

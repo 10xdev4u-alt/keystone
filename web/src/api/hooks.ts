@@ -26,6 +26,8 @@ type MessageListResponse = components["schemas"]["MessageListResponse"];
 type SendMessageResponse = components["schemas"]["SendMessageResponse"];
 type ConversationResponse = components["schemas"]["ConversationResponse"];
 type EventDetailResponse = components["schemas"]["EventDetailResponse"];
+type CourseListResponse = components["schemas"]["CourseListResponse"];
+type CourseDetailResponse = components["schemas"]["CourseDetailResponse"];
 type LoginRequest = components["schemas"]["LoginRequest"];
 type PostListPage = components["schemas"]["PostListPage"];
 type PostDetailResponse = components["schemas"]["PostDetailResponse"];
@@ -658,7 +660,7 @@ export function useJoinCommunity(
 
 export function useCourses(
   query: operations["list_courses"]["parameters"]["query"] = {},
-  options?: UseQueryOptions<unknown, ApiRequestError>,
+  options?: QueryOptions<CourseListResponse>,
 ) {
   return useQuery({
     queryKey: ["courses", query],
@@ -667,8 +669,28 @@ export function useCourses(
         params: { query },
       });
       if (error) throw error;
+      if (!data) throw new Error("Empty courses response");
       return data;
     },
+    staleTime: 30_000,
+    ...options,
+  });
+}
+
+/** A course by slug, with its module tree. */
+export function useCourse(slug: string, options?: QueryOptions<CourseDetailResponse>) {
+  return useQuery({
+    queryKey: ["courses", slug],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/courses/{slug}", {
+        params: { path: { slug } },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty course response");
+      return data;
+    },
+    enabled: Boolean(slug),
+    staleTime: 30_000,
     ...options,
   });
 }
