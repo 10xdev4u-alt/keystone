@@ -25,6 +25,7 @@ type ConversationListResponse = components["schemas"]["ConversationListResponse"
 type MessageListResponse = components["schemas"]["MessageListResponse"];
 type SendMessageResponse = components["schemas"]["SendMessageResponse"];
 type ConversationResponse = components["schemas"]["ConversationResponse"];
+type EventDetailResponse = components["schemas"]["EventDetailResponse"];
 type LoginRequest = components["schemas"]["LoginRequest"];
 type PostListPage = components["schemas"]["PostListPage"];
 type PostDetailResponse = components["schemas"]["PostDetailResponse"];
@@ -686,6 +687,24 @@ export function useEvents(
       if (!data) throw new Error("Empty events response");
       return data;
     },
+    staleTime: 30_000,
+    ...options,
+  });
+}
+
+/** A single event by slug, with speakers and the caller's registration. */
+export function useEvent(slug: string, options?: QueryOptions<EventDetailResponse>) {
+  return useQuery({
+    queryKey: ["events", slug],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/events/{slug}", {
+        params: { path: { slug } },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty event response");
+      return data;
+    },
+    enabled: Boolean(slug),
     staleTime: 30_000,
     ...options,
   });

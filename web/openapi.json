@@ -2210,7 +2210,9 @@
             "description": "Event",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/EventDetailResponse"
+                }
               }
             }
           },
@@ -6727,6 +6729,31 @@
           "start_year": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "EventDetailResponse": {
+        "type": "object",
+        "description": "Full event detail: the card fields + speakers and the caller's\nregistration status (registered / waitlisted / null).",
+        "required": [
+          "event",
+          "speakers"
+        ],
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/EventView"
+          },
+          "my_registration": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "speakers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
