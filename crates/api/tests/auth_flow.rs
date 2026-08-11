@@ -53,7 +53,7 @@ fn test_auth() -> AuthServices {
 }
 
 async fn test_app() -> Option<axum::Router> {
-    let pool = keystone_db::test_util::test_pool().await?;
+    let pool = keystone_db::test_util::test_pool_isolated().await?;
     keystone_db::test_util::setup(&pool)
         .await
         .expect("db setup");

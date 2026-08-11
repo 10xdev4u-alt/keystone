@@ -5107,6 +5107,51 @@
         }
       }
     },
+    "/api/v1/search": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Search everything the engine indexes.",
+        "operationId": "search",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Search query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size (1..=50)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ranked hits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Empty query"
+          }
+        }
+      }
+    },
     "/api/v1/sessions/{session_id}/feedback": {
       "post": {
         "tags": [
@@ -6997,6 +7042,75 @@
           }
         }
       },
+      "SearchHitView": {
+        "type": "object",
+        "description": "One ranked hit across posts, users, communities and courses.",
+        "required": [
+          "entity_type",
+          "entity_id",
+          "title",
+          "snippet",
+          "score"
+        ],
+        "properties": {
+          "entity_id": {
+            "type": "string"
+          },
+          "entity_type": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number",
+            "format": "double"
+          },
+          "snippet": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "SearchQuery": {
+        "type": "object",
+        "description": "Search request.",
+        "required": [
+          "q"
+        ],
+        "properties": {
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Page size (1..=50)."
+          },
+          "q": {
+            "type": "string",
+            "description": "The raw search string (FTS lexemes + typo fallback)."
+          }
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "description": "Search response — ranked hits for a query.",
+        "required": [
+          "query",
+          "results"
+        ],
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchHitView"
+            }
+          }
+        }
+      },
       "SendMessageRequest": {
         "type": "object",
         "required": [
@@ -7388,6 +7502,10 @@
     {
       "name": "qa",
       "description": "Answers, voting, bounties"
+    },
+    {
+      "name": "search",
+      "description": "Unified platform search"
     },
     {
       "name": "network",

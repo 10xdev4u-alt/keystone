@@ -30,6 +30,7 @@ type CommunityPostList = components["schemas"]["CommunityPostList"];
 type EventList = components["schemas"]["EventList"];
 type OrgList = components["schemas"]["OrgList"];
 type OrgDetailResponse = components["schemas"]["OrgDetailResponse"];
+type SearchResponse = components["schemas"]["SearchResponse"];
 
 /**
  * Caller-facing options for query wrapper hooks. The hook owns `queryKey` and
@@ -372,6 +373,27 @@ export function useOrgs(
       if (!data) throw new Error("Empty orgs response");
       return data;
     },
+    staleTime: 30_000,
+    ...options,
+  });
+}
+
+/** Unified platform search — FTS + typo tolerance on the backend. */
+export function useSearch(
+  q: string,
+  options?: QueryOptions<SearchResponse>,
+) {
+  return useQuery({
+    queryKey: ["search", q],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/search", {
+        params: { query: { q } },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty search response");
+      return data;
+    },
+    enabled: q.trim().length > 0,
     staleTime: 30_000,
     ...options,
   });

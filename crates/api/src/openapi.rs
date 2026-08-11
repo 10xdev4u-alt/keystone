@@ -72,6 +72,8 @@ use utoipa::{Modify, OpenApi};
         crate::qa::get_bounty,
         crate::qa::award_bounty,
 
+        crate::search_api::search,
+
         crate::network::create_org,
         crate::network::list_orgs,
         crate::network::get_org,
@@ -213,6 +215,9 @@ use utoipa::{Modify, OpenApi};
         crate::network::OrgView,
         crate::network::OrgList,
         crate::network::OrgDetailResponse,
+        crate::search_api::SearchHitView,
+        crate::search_api::SearchResponse,
+        crate::search_api::SearchQuery,
         crate::network::CreateOrgRequest,
         crate::network::SetRoleRequest,
         crate::network::ClaimRequest,
@@ -261,6 +266,7 @@ use utoipa::{Modify, OpenApi};
         (name = "social", description = "Communities, polls, locking"),
         (name = "qa", description = "Answers, voting, bounties"),
 
+        (name = "search", description = "Unified platform search"),
         (name = "network", description = "Organizations, connections, profiles"),
         (name = "careers", description = "Salaries, vendors, alerts, career paths"),
         (name = "learning", description = "Courses, assessments, credits, mentorship, events"),

@@ -1,0 +1,123 @@
+.search {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.search__title {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.search__subtitle {
+  margin: 0 0 0.75rem;
+  color: var(--color-text-muted, #667);
+}
+
+.search__label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.search__input {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  font: inherit;
+  font-size: 1rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-surface, #fff);
+  color: inherit;
+}
+
+.search__input:focus {
+  outline: 2px solid var(--color-focus, #6366f1);
+  outline-offset: 1px;
+}
+
+.search__loading {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+
+.search__count {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #667);
+}
+
+.search__results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.search-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.9rem 1.05rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-surface, #fff);
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.search-hit:hover {
+  border-color: var(--color-border-strong, #c9cdd4);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.05);
+}
+
+.search-hit__type {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  align-self: flex-start;
+  color: var(--color-kind-fg, #4b5563);
+  background: var(--color-kind-bg, #f3f4f6);
+}
+
+.search-hit__type[data-type="post"] {
+  --color-kind-fg: #1d4ed8;
+  --color-kind-bg: #dbeafe;
+}
+
+.search-hit__type[data-type="community"] {
+  --color-kind-fg: #7c3aed;
+  --color-kind-bg: #ede9fe;
+}
+
+.search-hit__type[data-type="course"] {
+  --color-kind-fg: #047857;
+  --color-kind-bg: #d1fae5;
+}
+
+.search-hit__title {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.search-hit__snippet {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--color-text-muted, #667);
+}

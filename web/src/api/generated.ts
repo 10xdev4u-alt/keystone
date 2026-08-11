@@ -1919,6 +1919,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search everything the engine indexes. */
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{session_id}/feedback": {
         parameters: {
             query?: never;
@@ -2502,6 +2519,30 @@ export interface components {
             currency: string;
             location?: string | null;
             role: string;
+        };
+        /** @description One ranked hit across posts, users, communities and courses. */
+        SearchHitView: {
+            entity_id: string;
+            entity_type: string;
+            /** Format: double */
+            score: number;
+            snippet: string;
+            title: string;
+        };
+        /** @description Search request. */
+        SearchQuery: {
+            /**
+             * Format: int64
+             * @description Page size (1..=50).
+             */
+            limit?: number | null;
+            /** @description The raw search string (FTS lexemes + typo fallback). */
+            q: string;
+        };
+        /** @description Search response — ranked hits for a query. */
+        SearchResponse: {
+            query: string;
+            results: components["schemas"]["SearchHitView"][];
         };
         SendMessageRequest: {
             body: string;
@@ -6882,6 +6923,38 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query: {
+                /** @description Search query */
+                q: string;
+                /** @description Page size (1..=50) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ranked hits */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResponse"];
+                };
+            };
+            /** @description Empty query */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

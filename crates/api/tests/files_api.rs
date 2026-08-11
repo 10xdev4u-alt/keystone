@@ -20,7 +20,7 @@ use std::time::Instant;
 use tower::util::ServiceExt;
 
 async fn test_app() -> Option<(axum::Router, Arc<keystone_db::storage::MemoryStorage>)> {
-    let pool = keystone_db::test_util::test_pool().await?;
+    let pool = keystone_db::test_util::test_pool_isolated().await?;
     keystone_db::test_util::setup(&pool)
         .await
         .expect("db setup");
@@ -280,7 +280,7 @@ async fn quota_overshoot_is_rejected_with_400() {
     };
     let (alice, id) = register_user(&app, "files-quota@test.dev").await;
 
-    let pool = keystone_db::test_util::test_pool()
+    let pool = keystone_db::test_util::test_pool_isolated()
         .await
         .expect("test database reachable");
     let files = keystone_db::repositories::files::Files::new(pool);

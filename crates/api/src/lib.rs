@@ -25,6 +25,7 @@ pub mod openapi;
 pub mod qa;
 pub mod rbac;
 pub mod realtime;
+pub mod search_api;
 pub mod social;
 
 use axum::extract::State;
@@ -200,6 +201,7 @@ pub fn router(state: AppState) -> Router {
             get(network::list_orgs).post(network::create_org),
         )
         .route("/api/v1/orgs/{slug}", get(network::get_org))
+        .route("/api/v1/search", get(search_api::search))
         .route("/api/v1/orgs/{slug}/join", post(network::join_org))
         .route(
             "/api/v1/orgs/{slug}/leave",
