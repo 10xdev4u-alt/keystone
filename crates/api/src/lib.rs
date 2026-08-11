@@ -14,6 +14,7 @@ pub mod content;
 pub mod csrf;
 pub mod error;
 pub mod headers;
+pub mod learning_api;
 pub mod middleware;
 pub mod moderation;
 pub mod network;
@@ -278,6 +279,105 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/me/assessments",
             get(careers_api::my_assessments).post(careers_api::add_assessment),
+        )
+        // ── Month 6: learning, mentorship, events ────────────────────
+        .route(
+            "/api/v1/courses",
+            get(learning_api::list_courses).post(learning_api::create_course),
+        )
+        .route("/api/v1/courses/{slug}", get(learning_api::get_course))
+        .route(
+            "/api/v1/courses/{slug}/publish",
+            post(learning_api::publish_course),
+        )
+        .route("/api/v1/courses/{slug}/enroll", post(learning_api::enroll))
+        .route(
+            "/api/v1/courses/{slug}/modules",
+            post(learning_api::add_module),
+        )
+        .route(
+            "/api/v1/courses/{slug}/modules/{module_id}/lessons",
+            post(learning_api::add_lesson),
+        )
+        .route(
+            "/api/v1/courses/{slug}/lessons/{lesson_id}/complete",
+            post(learning_api::complete_lesson),
+        )
+        .route(
+            "/api/v1/courses/{slug}/progress",
+            get(learning_api::course_progress),
+        )
+        .route(
+            "/api/v1/me/certificates",
+            get(learning_api::my_certificates),
+        )
+        .route(
+            "/api/v1/courses/{slug}/assessments",
+            post(learning_api::create_assessment),
+        )
+        .route(
+            "/api/v1/courses/{slug}/assessments/{assessment_id}/questions",
+            post(learning_api::add_question),
+        )
+        .route(
+            "/api/v1/assessments/{id}",
+            get(learning_api::get_assessment),
+        )
+        .route(
+            "/api/v1/assessments/{id}/attempts",
+            get(learning_api::my_attempts).post(learning_api::start_attempt),
+        )
+        .route(
+            "/api/v1/attempts/{id}/submit",
+            post(learning_api::submit_attempt),
+        )
+        .route("/api/v1/me/credits", get(learning_api::my_balance))
+        .route(
+            "/api/v1/me/credits/redeem",
+            post(learning_api::redeem_credits),
+        )
+        .route("/api/v1/me/credits/ledger", get(learning_api::my_ledger))
+        .route(
+            "/api/v1/me/mentor-profile",
+            axum::routing::put(learning_api::set_mentor_profile),
+        )
+        .route("/api/v1/mentors", get(learning_api::available_mentors))
+        .route(
+            "/api/v1/users/{mentor_id}/mentorship",
+            post(learning_api::request_mentorship),
+        )
+        .route(
+            "/api/v1/mentorship/{request_id}/accept",
+            post(learning_api::accept_mentorship),
+        )
+        .route(
+            "/api/v1/mentorship/{request_id}/decline",
+            post(learning_api::decline_mentorship),
+        )
+        .route(
+            "/api/v1/mentorship/{request_id}/sessions",
+            post(learning_api::schedule_session),
+        )
+        .route(
+            "/api/v1/sessions/{session_id}/feedback",
+            post(learning_api::add_feedback),
+        )
+        .route(
+            "/api/v1/events",
+            get(learning_api::list_events).post(learning_api::create_event),
+        )
+        .route("/api/v1/events/{slug}", get(learning_api::get_event))
+        .route(
+            "/api/v1/events/{slug}/register",
+            post(learning_api::register_event),
+        )
+        .route(
+            "/api/v1/events/{slug}/registration",
+            axum::routing::delete(learning_api::cancel_registration),
+        )
+        .route(
+            "/api/v1/events/{slug}/speakers/{speaker_id}",
+            post(learning_api::add_speaker),
         )
         .route("/api/v1/reports", post(moderation::file_report))
         .route(
