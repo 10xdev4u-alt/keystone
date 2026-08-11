@@ -255,22 +255,46 @@ impl FromRequestParts<AppState> for MaybeUser {
 
 // ── Post view (no counters for single read; counts come from the view) ─────
 
-fn post_view(post: &keystone_db::repositories::posts::Post) -> Value {
-    json!({
-        "id": post.id.to_string(),
-        "author_id": post.author_id.to_string(),
-        "kind": post.kind,
-        "title": post.title,
-        "slug": post.slug,
-        "body": post.body,
-        "summary": post.summary,
-        "status": post.status,
-        "visibility": post.visibility,
-        "view_count": post.view_count,
-        "published_at": post.published_at,
-        "created_at": post.created_at,
-        "updated_at": post.updated_at,
-    })
+/// Full post — the reader view contract.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct PostView {
+    pub id: String,
+    pub author_id: String,
+    pub kind: String,
+    pub title: String,
+    pub slug: String,
+    pub body: String,
+    /// Markdown rendered to sanitized HTML server-side (see `keystone_db::markdown`).
+    pub body_html: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    pub status: String,
+    pub visibility: String,
+    pub view_count: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub published_at: Option<String>,
+    pub created_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+}
+
+fn post_view(post: &keystone_db::repositories::posts::Post) -> PostView {
+    PostView {
+        id: post.id.to_string(),
+        author_id: post.author_id.to_string(),
+        kind: post.kind.clone(),
+        title: post.title.clone().unwrap_or_default(),
+        slug: post.slug.clone(),
+        body: post.body.clone(),
+        body_html: keystone_db::markdown::render(&post.body),
+        summary: post.summary.clone(),
+        status: post.status.clone(),
+        visibility: post.visibility.clone(),
+        view_count: post.view_count,
+        published_at: post.published_at.map(|t| t.to_rfc3339()),
+        created_at: post.created_at.to_rfc3339(),
+        updated_at: Some(post.updated_at.to_rfc3339()),
+    }
 }
 
 /// The read may only see the post when its visibility allows.
@@ -379,7 +403,7 @@ pub async fn get_post(
     State(state): State<AppState>,
     maybe: MaybeUser,
     Path(key): Path<String>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<PostDetailResponse>> {
     // Canonical URLs use the slug; UUID reads are accepted too. Both ride the
     // same `{id}` path slot so it never conflicts with the UUID routes below.
     let posts = Posts::new(state.pool.clone());
@@ -391,7 +415,9 @@ pub async fn get_post(
     if !can_read(maybe.0.as_ref(), &post) {
         return Err(ApiError::NotFound); // hide existence of unlisted/private
     }
-    Ok(Json(json!({ "post": post_view(&post) })))
+    Ok(Json(PostDetailResponse {
+        post: post_view(&post),
+    }))
 }
 
 /// A related-reading card: same tag family, ranked by overlap then recency.
@@ -443,27 +469,6 @@ pub async fn get_related(
             })
             .collect(),
     }))
-}
-
-/// Full post — the reader view contract.
-#[derive(Debug, serde::Serialize, ToSchema)]
-pub struct PostView {
-    pub id: String,
-    pub author_id: String,
-    pub kind: String,
-    pub title: String,
-    pub slug: String,
-    pub body: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub summary: Option<String>,
-    pub status: String,
-    pub visibility: String,
-    pub view_count: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub published_at: Option<String>,
-    pub created_at: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<String>,
 }
 
 /// Wrapper for the single-post endpoint.

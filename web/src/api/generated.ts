@@ -4,6 +4,40 @@
  */
 
 export interface paths {
+    "/api/v1/admin/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Operator visibility: instance stats. RBAC-guarded (admin/super_admin). */
+        get: operations["admin_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin user directory. RBAC-guarded (admin/super_admin). */
+        get: operations["admin_users"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/answers/{id}/vote": {
         parameters: {
             query?: never;
@@ -2172,6 +2206,35 @@ export interface components {
         AddPollOptionRequest: {
             text: string;
         };
+        /** @description Instance stats for the admin overview. */
+        AdminStatusResponse: {
+            /** Format: int64 */
+            live_sessions?: number | null;
+            status: string;
+            /** Format: int64 */
+            uptime_secs: number;
+            /** Format: int64 */
+            users?: number | null;
+        };
+        /** @description Admin user directory page. */
+        AdminUserList: {
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            offset: number;
+            users: components["schemas"]["AdminUserView"][];
+        };
+        /** @description One row of the admin user directory. */
+        AdminUserView: {
+            created_at: string;
+            email: string;
+            id: string;
+            is_verified: boolean;
+            last_login_at?: string | null;
+            role: string;
+            status: string;
+            username?: string | null;
+        };
         AlertRequest: {
             kind: string;
             message: string;
@@ -2532,6 +2595,8 @@ export interface components {
         PostView: {
             author_id: string;
             body: string;
+            /** @description Markdown rendered to sanitized HTML server-side (see `keystone_db::markdown`). */
+            body_html: string;
             created_at: string;
             id: string;
             kind: string;
@@ -2610,6 +2675,25 @@ export interface components {
             limit?: number;
             /** Format: int64 */
             offset?: number;
+        };
+        /** @description Staff queue page. */
+        ReportQueueResponse: {
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            offset: number;
+            reports: components["schemas"]["ReportView"][];
+        };
+        /** @description One open report in the staff queue. */
+        ReportView: {
+            created_at: string;
+            detail?: string | null;
+            entity_id: string;
+            entity_type: string;
+            id: string;
+            reason: string;
+            reporter_id: string;
+            status: string;
         };
         ResetPasswordRequest: {
             email: string;
@@ -2771,6 +2855,79 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    admin_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Instance stats */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminStatusResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not an admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    admin_users: {
+        parameters: {
+            query?: {
+                /** @description Page size (1..=100) */
+                limit?: number;
+                /** @description Page offset */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User directory page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserList"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not an admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     vote_answer: {
         parameters: {
             query?: never;
@@ -5364,7 +5521,12 @@ export interface operations {
     };
     report_queue: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Page size (1..=50) */
+                limit?: number;
+                /** @description Page offset */
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5377,7 +5539,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ReportQueueResponse"];
                 };
             };
             /** @description Missing or invalid access token */

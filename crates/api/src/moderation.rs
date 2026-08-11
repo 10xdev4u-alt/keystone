@@ -15,7 +15,7 @@ use axum::Json;
 use keystone_db::repositories::moderation::{Moderation, NewModerationAction};
 use keystone_db::repositories::reports::{NewReport, Reports};
 use keystone_db::repositories::reviews::{NewReview, Reviews};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -117,12 +117,38 @@ pub async fn file_report(
     ))
 }
 
+/// One open report in the staff queue.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ReportView {
+    pub id: String,
+    pub reporter_id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub reason: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+    pub status: String,
+    pub created_at: String,
+}
+
+/// Staff queue page.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ReportQueueResponse {
+    pub reports: Vec<ReportView>,
+    pub limit: i64,
+    pub offset: i64,
+}
+
 /// Staff queue of open reports.
 #[utoipa::path(
     get,
     path = "/api/v1/moderation/reports",
+    params(
+        ("limit" = Option<i64>, Query, description = "Page size (1..=50)"),
+        ("offset" = Option<i64>, Query, description = "Page offset"),
+    ),
     responses(
-        (status = 200, description = "Open reports", body = Value),
+        (status = 200, description = "Open reports", body = ReportQueueResponse),
         (status = 401, description = "Missing or invalid access token"),
         (status = 403, description = "Not a moderator"),
     ),
@@ -133,7 +159,7 @@ pub async fn report_queue(
     State(state): State<AppState>,
     _auth_user: AuthUser, // guarded by require_moderator at the router
     Query(query): Query<ReportQueueQuery>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<ReportQueueResponse>> {
     let limit = query.limit.clamp(1, 50);
     let offset = query.offset.max(0);
     let reports = Reports::new(state.pool.clone());
@@ -144,24 +170,24 @@ pub async fn report_queue(
             keystone_db::repositories::RepoError::Database(e) => ApiError::Database(e),
             other => ApiError::BadRequest(other.to_string()),
         })?;
-    let items: Vec<Value> = rows
+    let items = rows
         .into_iter()
-        .map(|r| {
-            json!({
-                "id": r.id.to_string(),
-                "reporter_id": r.reporter_id.to_string(),
-                "entity_type": r.entity_type,
-                "entity_id": r.entity_id.to_string(),
-                "reason": r.reason,
-                "detail": r.detail,
-                "status": r.status,
-                "created_at": r.created_at,
-            })
+        .map(|r| ReportView {
+            id: r.id.to_string(),
+            reporter_id: r.reporter_id.to_string(),
+            entity_type: r.entity_type,
+            entity_id: r.entity_id.to_string(),
+            reason: r.reason,
+            detail: r.detail,
+            status: r.status,
+            created_at: r.created_at.to_rfc3339(),
         })
         .collect();
-    Ok(Json(
-        json!({ "reports": items, "limit": limit, "offset": offset }),
-    ))
+    Ok(Json(ReportQueueResponse {
+        reports: items,
+        limit,
+        offset,
+    }))
 }
 
 #[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, report_id = %id))]

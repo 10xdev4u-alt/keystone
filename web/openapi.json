@@ -16,6 +16,92 @@
     }
   ],
   "paths": {
+    "/api/v1/admin/status": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Operator visibility: instance stats. RBAC-guarded (admin/super_admin).",
+        "operationId": "admin_status",
+        "responses": {
+          "200": {
+            "description": "Instance stats",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/users": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Admin user directory. RBAC-guarded (admin/super_admin).",
+        "operationId": "admin_users",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size (1..=100)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Page offset",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User directory page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/api/v1/answers/{id}/vote": {
       "put": {
         "tags": [
@@ -3073,12 +3159,36 @@
         ],
         "summary": "Staff queue of open reports.",
         "operationId": "report_queue",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size (1..=50)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Page offset",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Open reports",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ReportQueueResponse"
+                }
               }
             }
           },
@@ -5705,6 +5815,107 @@
           }
         }
       },
+      "AdminStatusResponse": {
+        "type": "object",
+        "description": "Instance stats for the admin overview.",
+        "required": [
+          "status",
+          "uptime_secs"
+        ],
+        "properties": {
+          "live_sessions": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          },
+          "uptime_secs": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "users": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "AdminUserList": {
+        "type": "object",
+        "description": "Admin user directory page.",
+        "required": [
+          "users",
+          "limit",
+          "offset"
+        ],
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUserView"
+            }
+          }
+        }
+      },
+      "AdminUserView": {
+        "type": "object",
+        "description": "One row of the admin user directory.",
+        "required": [
+          "id",
+          "email",
+          "role",
+          "status",
+          "is_verified",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_verified": {
+            "type": "boolean"
+          },
+          "last_login_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "AlertRequest": {
         "type": "object",
         "required": [
@@ -6973,6 +7184,7 @@
           "title",
           "slug",
           "body",
+          "body_html",
           "status",
           "visibility",
           "view_count",
@@ -6984,6 +7196,10 @@
           },
           "body": {
             "type": "string"
+          },
+          "body_html": {
+            "type": "string",
+            "description": "Markdown rendered to sanitized HTML server-side (see `keystone_db::markdown`)."
           },
           "created_at": {
             "type": "string"
@@ -7281,6 +7497,73 @@
           "offset": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "ReportQueueResponse": {
+        "type": "object",
+        "description": "Staff queue page.",
+        "required": [
+          "reports",
+          "limit",
+          "offset"
+        ],
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportView"
+            }
+          }
+        }
+      },
+      "ReportView": {
+        "type": "object",
+        "description": "One open report in the staff queue.",
+        "required": [
+          "id",
+          "reporter_id",
+          "entity_type",
+          "entity_id",
+          "reason",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entity_id": {
+            "type": "string"
+          },
+          "entity_type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "reporter_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
           }
         }
       },

@@ -944,3 +944,79 @@ async fn feed_paginates_by_keyset_cursor() {
         .unwrap();
     assert_eq!(bad.status(), StatusCode::BAD_REQUEST);
 }
+
+// ── Admin console endpoints ────────────────────────────────────────────────
+
+#[tokio::test]
+async fn admin_status_and_user_directory_are_role_gated() {
+    let Some((app, pool)) = test_app().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let alice = register_and_login(&app, "alice-admin@example.com").await;
+    let admin = make_user_with_role(&pool, "root-admin@example.com", "super_admin").await;
+    let moderator = make_user_with_role(&pool, "mod-admin@example.com", "moderator").await;
+
+    // Regular users are blocked from both admin routes.
+    for path in ["/api/v1/admin/status", "/api/v1/admin/users"] {
+        let blocked = app
+            .clone()
+            .oneshot(request("GET", path, Some(&alice), None))
+            .await
+            .unwrap();
+        assert_eq!(
+            blocked.status(),
+            StatusCode::FORBIDDEN,
+            "{path} denies users"
+        );
+    }
+
+    // Moderators can see the queue but not the admin directory.
+    let mod_queue = app
+        .clone()
+        .oneshot(request(
+            "GET",
+            "/api/v1/moderation/reports",
+            Some(&moderator),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(mod_queue.status(), StatusCode::OK);
+    let mod_admin = app
+        .clone()
+        .oneshot(request(
+            "GET",
+            "/api/v1/admin/users",
+            Some(&moderator),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(mod_admin.status(), StatusCode::FORBIDDEN);
+
+    // An admin gets typed stats and the directory (includes everyone created).
+    let status = app
+        .clone()
+        .oneshot(request("GET", "/api/v1/admin/status", Some(&admin), None))
+        .await
+        .unwrap();
+    assert_eq!(status.status(), StatusCode::OK);
+    let body = json_body(status).await;
+    assert_eq!(body["status"], "ok");
+    assert!(body["users"].as_i64().unwrap() >= 3);
+
+    let directory = app
+        .clone()
+        .oneshot(request("GET", "/api/v1/admin/users", Some(&admin), None))
+        .await
+        .unwrap();
+    assert_eq!(directory.status(), StatusCode::OK);
+    let body = json_body(directory).await;
+    let users = body["users"].as_array().unwrap();
+    assert!(users.iter().any(|u| u["email"] == "root-admin@example.com"));
+    assert!(users
+        .iter()
+        .any(|u| u["email"] == "alice-admin@example.com"));
+    assert!(users.iter().all(|u| u["role"].is_string()));
+}

@@ -43,6 +43,15 @@ const SearchPage = lazy(() =>
 const ProfilePage = lazy(() =>
   import("../pages/ProfilePage").then((m) => ({ default: m.ProfilePage })),
 );
+const AdminOverviewPage = lazy(() =>
+  import("../pages/admin/AdminOverviewPage").then((m) => ({ default: m.AdminOverviewPage })),
+);
+const AdminModerationPage = lazy(() =>
+  import("../pages/admin/AdminModerationPage").then((m) => ({ default: m.AdminModerationPage })),
+);
+const AdminUsersPage = lazy(() =>
+  import("../pages/admin/AdminUsersPage").then((m) => ({ default: m.AdminUsersPage })),
+);
 const LoginPage = lazy(() =>
   import("../pages/auth/LoginPage").then((m) => ({ default: m.LoginPage })),
 );
@@ -117,9 +126,9 @@ export const routesConfig: RouteObject[] = [
     element: <AdminLayout />,
     errorElement: <RouteErrorBoundary />,
     children: [
-      { path: "/admin", element: withSuspense(<Placeholder title="Admin overview" />) },
-      { path: "/admin/moderation", element: withSuspense(<Placeholder title="Moderation queue" />) },
-      { path: "/admin/users", element: withSuspense(<Placeholder title="Users" />) },
+      { path: "/admin", element: withSuspense(<AdminOverviewPage />) },
+      { path: "/admin/moderation", element: withSuspense(<AdminModerationPage />) },
+      { path: "/admin/users", element: withSuspense(<AdminUsersPage />) },
     ],
   },
 ];

@@ -1,0 +1,210 @@
+.admin-page {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.admin-page__header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+}
+
+.admin-page__sub {
+  margin: 0;
+  color: var(--color-text-muted, #94a3b8);
+  font-size: 0.9rem;
+}
+
+.admin-page__foot {
+  color: var(--color-text-muted, #94a3b8);
+  font-size: 0.85rem;
+}
+
+/* ── Stats ───────────────────────────────────────────────────────────────── */
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.admin-stat {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--color-border, rgba(148, 163, 184, 0.2));
+  border-radius: 12px;
+  background: var(--color-surface, #0f172a);
+}
+
+.admin-stat__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.admin-stat__value {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.admin-stat[data-tone="good"] .admin-stat__value {
+  color: #10b981;
+}
+
+.admin-stat[data-tone="warn"] .admin-stat__value {
+  color: #f59e0b;
+}
+
+/* ── List cards (moderation) ─────────────────────────────────────────────── */
+.admin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-card {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--color-border, rgba(148, 163, 184, 0.2));
+  border-radius: 12px;
+  background: var(--color-surface, #0f172a);
+}
+
+.admin-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-card__meta {
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.admin-card__reason {
+  margin: 0;
+  font-weight: 600;
+}
+
+.admin-card__detail {
+  margin: 0;
+  color: var(--color-text-muted, #94a3b8);
+  font-size: 0.9rem;
+}
+
+.admin-card__actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.admin-card__note {
+  flex: 1;
+  padding: 0.45rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border, rgba(148, 163, 184, 0.3));
+  background: var(--color-bg, #0e1626);
+  color: var(--color-text, #e2e8f0);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.admin-card__error {
+  margin: 0;
+  color: #ef4444;
+  font-size: 0.85rem;
+}
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.admin-badge[data-type="post"],
+.admin-badge[data-role="moderator"] {
+  background: rgba(99, 102, 241, 0.14);
+  color: #a5b4fc;
+}
+
+.admin-badge[data-type="comment"] {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fbbf24;
+}
+
+.admin-badge[data-type="user"],
+.admin-badge[data-role="super_admin"],
+.admin-badge[data-role="admin"] {
+  background: rgba(16, 185, 129, 0.14);
+  color: #34d399;
+}
+
+/* ── Table (users) ───────────────────────────────────────────────────────── */
+.admin-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border, rgba(148, 163, 184, 0.2));
+  border-radius: 12px;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 0.7rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border, rgba(148, 163, 184, 0.12));
+  white-space: nowrap;
+}
+
+.admin-table th {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted, #94a3b8);
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-table__link {
+  display: block;
+  color: var(--color-text, #e2e8f0);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.admin-table__link:hover {
+  color: var(--color-accent, #6366f1);
+}
+
+.admin-table__email {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.admin-row {
+  height: 3.5rem;
+  border-radius: 10px;
+}

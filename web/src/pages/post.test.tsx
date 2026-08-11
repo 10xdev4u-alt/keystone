@@ -13,6 +13,7 @@ const postFixture = {
     title: "A post worth reading",
     slug: "a-post-worth-reading",
     body: "The full body of the post.",
+    body_html: "<h2>Intro</h2><p>The full body of the post.</p><h3>Details</h3><p>More.</p>",
     summary: "Short.",
     status: "published",
     visibility: "public",
@@ -96,6 +97,15 @@ describe("PostPage", () => {
       data: { posts: [] },
       isLoading: false,
     } as never);
+  });
+
+  it("renders rich text and a table of contents from headings", () => {
+    mockUseCurrentUser.mockReturnValue({ data: { id: "1" }, isLoading: false } as never);
+    renderPage();
+    expect(screen.getByText("The full body of the post.")).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "Table of contents" })).toBeTruthy();
+    expect(screen.getAllByText("Intro")).toHaveLength(2); // TOC link + heading
+    expect(screen.getAllByText("Details")).toHaveLength(2);
   });
 
   it("renders the related reading rail", () => {
