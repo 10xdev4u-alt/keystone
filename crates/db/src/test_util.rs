@@ -77,6 +77,8 @@ pub const APP_TABLES: &[&str] = &[
     "conversation_members",
     "messages",
     "presence",
+    "file_records",
+    "upload_quotas",
     "sessions",
     "email_verifications",
     "password_resets",
@@ -124,7 +126,10 @@ pub async fn test_pool_isolated() -> Option<PgPool> {
         .after_connect(move |connection, _| {
             let schema = owned.clone();
             Box::pin(async move {
-                sqlx::query(&format!("SET search_path TO {schema}"))
+                // `public` is appended so shared extension objects (pg_trgm)
+                // are visible; every application table still resolves to the
+                // isolated schema first, so no cross-test contamination.
+                sqlx::query(&format!("SET search_path TO {schema}, public"))
                     .execute(connection)
                     .await
                     .map(|_| ())
