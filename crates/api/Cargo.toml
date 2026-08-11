@@ -30,6 +30,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 url = "2"
 base64.workspace = true
 getrandom.workspace = true
+hex.workspace = true
+sha2.workspace = true
 
 [dev-dependencies]
 keystone-db = { path = "../db", features = ["test-util"] }

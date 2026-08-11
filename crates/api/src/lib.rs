@@ -9,12 +9,14 @@
 #![forbid(unsafe_code)]
 
 pub mod auth;
+pub mod careers_api;
 pub mod content;
 pub mod csrf;
 pub mod error;
 pub mod headers;
 pub mod middleware;
 pub mod moderation;
+pub mod network;
 pub mod oauth;
 pub mod qa;
 pub mod rbac;
@@ -177,6 +179,106 @@ pub fn router(state: AppState) -> Router {
             get(qa::get_bounty).post(qa::create_bounty),
         )
         .route("/api/v1/bounties/{id}/award", post(qa::award_bounty))
+        // ── Month 5: organizations, network, careers ──────────────────
+        .route(
+            "/api/v1/orgs",
+            get(network::list_orgs).post(network::create_org),
+        )
+        .route("/api/v1/orgs/{slug}", get(network::get_org))
+        .route("/api/v1/orgs/{slug}/join", post(network::join_org))
+        .route(
+            "/api/v1/orgs/{slug}/leave",
+            axum::routing::delete(network::leave_org),
+        )
+        .route("/api/v1/orgs/{slug}/members", get(network::list_members))
+        .route(
+            "/api/v1/orgs/{slug}/members/{member_id}",
+            axum::routing::patch(network::set_member_role),
+        )
+        .route("/api/v1/orgs/{slug}/claims", post(network::file_claim))
+        .route(
+            "/api/v1/orgs/{slug}/claims/{claim_id}/verify",
+            post(network::verify_claim),
+        )
+        .route(
+            "/api/v1/orgs/{slug}/vendors",
+            get(careers_api::list_vendors).post(careers_api::add_vendor),
+        )
+        .route(
+            "/api/v1/orgs/{slug}/vendors/{listing_id}",
+            axum::routing::delete(careers_api::remove_vendor),
+        )
+        .route(
+            "/api/v1/orgs/{slug}/vendors/{listing_id}/verify",
+            post(careers_api::verify_vendor),
+        )
+        .route(
+            "/api/v1/orgs/{slug}/alerts",
+            get(careers_api::list_alerts).post(careers_api::add_alert),
+        )
+        .route(
+            "/api/v1/orgs/{slug}/alerts/{alert_id}/resolve",
+            post(careers_api::resolve_alert),
+        )
+        .route(
+            "/api/v1/users/{user_id}/follow",
+            axum::routing::put(network::follow).delete(network::unfollow),
+        )
+        .route(
+            "/api/v1/users/{user_id}/connect",
+            axum::routing::put(network::connect).delete(network::cancel_connect),
+        )
+        .route(
+            "/api/v1/users/{user_id}/connections/accept",
+            post(network::accept_connection),
+        )
+        .route(
+            "/api/v1/users/{user_id}/connections/reject",
+            post(network::reject_connection),
+        )
+        .route(
+            "/api/v1/users/{user_id}/block",
+            axum::routing::put(network::block).delete(network::unblock),
+        )
+        .route("/api/v1/me/following", get(network::my_following))
+        .route("/api/v1/me/connections", get(network::my_connections))
+        .route("/api/v1/users/{user_id}/profile", get(network::get_profile))
+        .route(
+            "/api/v1/me/profile",
+            axum::routing::put(network::set_profile),
+        )
+        .route("/api/v1/me/education", post(network::add_education))
+        .route(
+            "/api/v1/me/education/{id}",
+            axum::routing::delete(network::remove_education),
+        )
+        .route("/api/v1/me/experience", post(network::add_experience))
+        .route(
+            "/api/v1/me/experience/{id}",
+            axum::routing::delete(network::remove_experience),
+        )
+        .route("/api/v1/me/skills", axum::routing::put(network::add_skill))
+        .route(
+            "/api/v1/me/skills/{skill}",
+            axum::routing::delete(network::remove_skill),
+        )
+        .route("/api/v1/salaries", post(careers_api::submit_salary))
+        .route(
+            "/api/v1/salaries/search",
+            get(careers_api::salaries_for_role),
+        )
+        .route(
+            "/api/v1/career-paths",
+            get(careers_api::list_career_paths).post(careers_api::create_career_path),
+        )
+        .route(
+            "/api/v1/career-paths/{path_id}",
+            get(careers_api::get_career_path).post(careers_api::add_step),
+        )
+        .route(
+            "/api/v1/me/assessments",
+            get(careers_api::my_assessments).post(careers_api::add_assessment),
+        )
         .route("/api/v1/reports", post(moderation::file_report))
         .route(
             "/api/v1/reviews",
