@@ -165,6 +165,7 @@ async fn credit_redemption_cannot_double_spend() {
             ok += 1;
         }
     }
+    assert!(ok >= 1, "at least one redemption must succeed (got {ok})");
     assert!(
         ok <= 3,
         "at most 3 redemptions of 3 from a balance of 10 (got {ok})"
@@ -267,7 +268,8 @@ async fn assessments_cap_attempts_and_grade_fairly() {
     let author = make_user(&pool, "assess-author@example.com").await;
     let student = make_user(&pool, "assess-student@example.com").await;
     let (course_id, _, _) = make_course(&pool, author, "assessed-course").await;
-    let assessments = Assessments::new(pool.clone());    let assessment = assessments
+    let assessments = Assessments::new(pool.clone());
+    let assessment = assessments
         .create_assessment(course_id, "Rust basics", 50, Some(300))
         .await
         .unwrap();
@@ -344,8 +346,18 @@ async fn assessments_cap_attempts_and_grade_fairly() {
         )
         .await
         .unwrap();
-    assert!(assessments.start_attempt(assessment.id, student).await.is_err());
-    assert_eq!(assessments.attempts_for(student, assessment.id).await.unwrap().len(), 3);
+    assert!(assessments
+        .start_attempt(assessment.id, student)
+        .await
+        .is_err());
+    assert_eq!(
+        assessments
+            .attempts_for(student, assessment.id)
+            .await
+            .unwrap()
+            .len(),
+        3
+    );
 
     // A wrong-only answer grades 0 → fails.
     let fresh = make_user(&pool, "assess-student2@example.com").await;

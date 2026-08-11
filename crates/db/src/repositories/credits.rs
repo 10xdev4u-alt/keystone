@@ -89,9 +89,39 @@ impl Credits {
         if amount <= 0 {
             return Err(RepoError::InvalidInput("amount must be positive".into()));
         }
+        // Serializability defeats the double-spend: two concurrent
+        // redemptions cannot both commit against the same balance. A loser
+        // aborts with 40001 and is retried against the NEW balance.
+        let mut last_err = None;
+        for _attempt in 0..3 {
+            match self
+                .redeem_once(user_id, amount, reason, reference_type, reference_id)
+                .await
+            {
+                Ok(entry) => return Ok(entry),
+                Err(RepoError::Database(sqlx::Error::Database(db)))
+                    if db.code().is_some_and(|c| c == "40001") =>
+                {
+                    last_err = Some(RepoError::InvalidInput(
+                        "credit redemption conflicted with a concurrent transaction; retry".into(),
+                    ));
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        Err(last_err.unwrap_or(RepoError::InvalidInput("redemption failed".into())))
+    }
+
+    /// One redemption transaction at SERIALIZABLE isolation.
+    async fn redeem_once(
+        &self,
+        user_id: Uuid,
+        amount: i32,
+        reason: &str,
+        reference_type: Option<&str>,
+        reference_id: Option<Uuid>,
+    ) -> Result<LedgerEntry, RepoError> {
         let mut tx = self.pool.begin().await?;
-        // Serializable isolation: concurrent redemptions abort instead of
-        // both reading the same balance (double-spend defense).
         sqlx::query("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
             .execute(&mut *tx)
             .await?;
@@ -127,8 +157,10 @@ impl Credits {
         tx: &mut Transaction<'_, Postgres>,
         user_id: Uuid,
     ) -> Result<i64, RepoError> {
+        // NOTE: no FOR UPDATE here — it is illegal on aggregate (SUM)
+        // queries. Serializability is what defeats the double-spend.
         let balance = sqlx::query_scalar::<_, Option<i64>>(
-            "SELECT SUM(delta) FROM credit_ledger WHERE user_id = $1 FOR UPDATE",
+            "SELECT SUM(delta) FROM credit_ledger WHERE user_id = $1",
         )
         .bind(user_id)
         .fetch_one(&mut **tx)
