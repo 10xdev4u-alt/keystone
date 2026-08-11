@@ -275,6 +275,7 @@ pub async fn send_message(
 #[utoipa::path(
     post,
     path = "/api/v1/conversations/{id}/read",
+    operation_id = "chat_mark_read",
     params(("id" = Uuid, Path, description = "Conversation id")),
     responses(
         (status = 200, description = "Unread state", body = Value),

@@ -352,6 +352,7 @@ pub struct MarkReadRequest {
 #[utoipa::path(
     post,
     path = "/api/v1/notifications/read",
+    operation_id = "notifications_mark_read",
     request_body = MarkReadRequest,
     responses(
         (status = 200, description = "Updated unread state", body = Value),
