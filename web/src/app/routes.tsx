@@ -21,6 +21,9 @@ const MyFeedPage = lazy(() =>
 const NotificationsPage = lazy(() =>
   import("../pages/NotificationsPage").then((m) => ({ default: m.NotificationsPage })),
 );
+const MessagesPage = lazy(() =>
+  import("../pages/MessagesPage").then((m) => ({ default: m.MessagesPage })),
+);
 
 const HomePage = lazy(() =>
   import("../pages/HomePage").then((m) => ({ default: m.HomePage })),
@@ -128,7 +131,7 @@ export const routesConfig: RouteObject[] = [
     children: [
       { path: "/me", element: withSuspense(<MyFeedPage />) },
       { path: "/me/notifications", element: withSuspense(<NotificationsPage />) },
-      { path: "/me/conversations", element: withSuspense(<Placeholder title="Messages" />) },
+      { path: "/me/conversations", element: withSuspense(<MessagesPage />) },
       { path: "/me/files", element: withSuspense(<Placeholder title="My files" />) },
       { path: "/me/profile", element: withSuspense(<Placeholder title="Profile" />) },
       { path: "/me/sessions", element: withSuspense(<SessionsPage />) },

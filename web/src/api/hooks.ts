@@ -21,6 +21,10 @@ type CreatePostRequest = components["schemas"]["CreatePostRequest"];
 type NotificationListResponse = components["schemas"]["NotificationListResponse"];
 type UnreadCountResponse = components["schemas"]["UnreadCountResponse"];
 type ReadReceiptResponse = components["schemas"]["ReadReceiptResponse"];
+type ConversationListResponse = components["schemas"]["ConversationListResponse"];
+type MessageListResponse = components["schemas"]["MessageListResponse"];
+type SendMessageResponse = components["schemas"]["SendMessageResponse"];
+type ConversationResponse = components["schemas"]["ConversationResponse"];
 type LoginRequest = components["schemas"]["LoginRequest"];
 type PostListPage = components["schemas"]["PostListPage"];
 type PostDetailResponse = components["schemas"]["PostDetailResponse"];
@@ -353,6 +357,89 @@ export function useMarkNotificationsRead(
     },
     onSuccess: (data, vars, ctx, mutation) => {
       qc.invalidateQueries({ queryKey: ["notifications"] });
+      options?.onSuccess?.(data, vars, ctx, mutation);
+    },
+  });
+}
+
+/** The caller's conversations (latest message first). */
+export function useConversations(options?: QueryOptions<ConversationListResponse>) {
+  return useQuery({
+    queryKey: ["conversations"],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/conversations");
+      if (error) throw error;
+      if (!data) throw new Error("Empty conversations response");
+      return data;
+    },
+    staleTime: 10_000,
+    ...options,
+  });
+}
+
+/** A conversation's message thread. */
+export function useMessages(
+  conversationId: string | null,
+  options?: QueryOptions<MessageListResponse>,
+) {
+  return useQuery({
+    queryKey: ["conversations", conversationId, "messages"],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/conversations/{id}/messages", {
+        params: { path: { id: conversationId! } },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty messages response");
+      return data;
+    },
+    enabled: Boolean(conversationId),
+    staleTime: 5_000,
+    ...options,
+  });
+}
+
+/** Send a message to a conversation (REST write path). */
+export function useSendMessage(
+  conversationId: string | null,
+  options?: UseMutationOptions<SendMessageResponse, ApiRequestError, { body: string }>,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    ...options,
+    mutationFn: async (payload) => {
+      const { data, error } = await client.POST("/api/v1/conversations/{id}/messages", {
+        params: { path: { id: conversationId! } },
+        body: payload,
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty send response");
+      return data;
+    },
+    onSuccess: (data, vars, ctx, mutation) => {
+      qc.invalidateQueries({ queryKey: ["conversations", conversationId, "messages"] });
+      qc.invalidateQueries({ queryKey: ["conversations"] });
+      options?.onSuccess?.(data, vars, ctx, mutation);
+    },
+  });
+}
+
+/** Open (or fetch) a direct conversation with another user. */
+export function useCreateConversation(
+  options?: UseMutationOptions<ConversationResponse, ApiRequestError, { user_id: string }>,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    ...options,
+    mutationFn: async (payload) => {
+      const { data, error } = await client.POST("/api/v1/conversations", {
+        body: { type: "direct", ...payload },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty conversation response");
+      return data;
+    },
+    onSuccess: (data, vars, ctx, mutation) => {
+      qc.invalidateQueries({ queryKey: ["conversations"] });
       options?.onSuccess?.(data, vars, ctx, mutation);
     },
   });

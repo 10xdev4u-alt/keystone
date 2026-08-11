@@ -1399,7 +1399,9 @@
             "description": "Conversations",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationListResponse"
+                }
               }
             }
           },
@@ -1434,7 +1436,9 @@
             "description": "Conversation created or existing",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationResponse"
+                }
               }
             }
           },
@@ -1473,7 +1477,9 @@
             "description": "Messages",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/MessageListResponse"
+                }
               }
             }
           },
@@ -1520,7 +1526,9 @@
             "description": "Message sent",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SendMessageResponse"
+                }
               }
             }
           },
@@ -6274,6 +6282,96 @@
           }
         }
       },
+      "ConversationListResponse": {
+        "type": "object",
+        "required": [
+          "conversations"
+        ],
+        "properties": {
+          "conversations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationView"
+            }
+          }
+        }
+      },
+      "ConversationRef": {
+        "type": "object",
+        "description": "Minimal conversation reference (create/fetch by other user).",
+        "required": [
+          "id",
+          "type"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "ConversationResponse": {
+        "type": "object",
+        "required": [
+          "conversation"
+        ],
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationRef"
+          }
+        }
+      },
+      "ConversationView": {
+        "type": "object",
+        "description": "A conversation as listed for the caller.",
+        "required": [
+          "id",
+          "type",
+          "created_at",
+          "unread"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "last_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_message_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "type": "string"
+          },
+          "unread": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "CreateAnswerRequest": {
         "type": "object",
         "required": [
@@ -6994,6 +7092,60 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "MessageListResponse": {
+        "type": "object",
+        "required": [
+          "messages"
+        ],
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageView"
+            }
+          }
+        }
+      },
+      "MessageView": {
+        "type": "object",
+        "description": "A single chat message.",
+        "required": [
+          "id",
+          "conversation_id",
+          "sender_id",
+          "body",
+          "sent_at"
+        ],
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "conversation_id": {
+            "type": "string"
+          },
+          "delivered_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "read_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sender_id": {
+            "type": "string"
+          },
+          "sent_at": {
+            "type": "string"
           }
         }
       },
@@ -7950,6 +8102,18 @@
         "properties": {
           "body": {
             "type": "string"
+          }
+        }
+      },
+      "SendMessageResponse": {
+        "type": "object",
+        "description": "Create / send responses carry the new row.",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/MessageView"
           }
         }
       },

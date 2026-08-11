@@ -1,0 +1,226 @@
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.messages__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.messages__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.messages__new {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+}
+
+.messages__new > *:first-child {
+  flex: 1 1 260px;
+}
+
+.messages__error {
+  margin: 0;
+  color: var(--danger, #d03050);
+  font-size: 0.85rem;
+  flex-basis: 100%;
+}
+
+.messages__layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 1rem;
+  min-height: 480px;
+}
+
+.messages__list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow-y: auto;
+  max-height: 560px;
+}
+
+.messages__list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.messages__convo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.85rem 1rem;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.messages__convo:hover {
+  background: var(--surface-hover);
+}
+
+.messages__convo--active {
+  background: var(--surface-muted);
+  border-left: 3px solid var(--accent);
+  padding-left: calc(1rem - 3px);
+}
+
+.messages__convo-title {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.messages__convo-preview {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.messages__convo-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+.messages__convo-unread {
+  min-width: 1.1rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--surface);
+  font-weight: 700;
+  text-align: center;
+}
+
+.messages__convo-skeleton {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.messages__convo-line {
+  height: 0.9rem;
+  width: 80%;
+}
+
+.messages__thread {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  min-height: 480px;
+}
+
+.messages__thread-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  overflow-y: auto;
+  max-height: 460px;
+}
+
+.messages__msg {
+  align-self: flex-start;
+  max-width: 75%;
+  background: var(--surface-muted);
+  border-radius: var(--radius-md);
+  padding: 0.55rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.messages__msg--mine {
+  align-self: flex-end;
+  background: var(--accent-soft, var(--surface-muted));
+}
+
+.messages__msg-body {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.messages__msg-time {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  align-self: flex-end;
+}
+
+.messages__msg-skeleton {
+  padding: 0.5rem;
+}
+
+.messages__msg-line {
+  height: 0.9rem;
+  width: 60%;
+}
+
+.messages__composer {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.messages__input {
+  flex: 1;
+  padding: 0.55rem 0.8rem;
+  font: inherit;
+  font-size: 0.92rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.messages__input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+@media (max-width: 720px) {
+  .messages__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .messages__list {
+    max-height: 200px;
+  }
+}
+
+@media (min-width: 640px) {
+  .messages {
+    padding-top: 2.5rem;
+  }
+}
