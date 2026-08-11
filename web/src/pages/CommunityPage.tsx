@@ -92,7 +92,9 @@ export function CommunityPage() {
           <ul className="community__members">
             {members?.members.map((m) => (
               <li key={m.user_id} className="community__member">
-                <span className="community__member-id">{m.user_id.slice(0, 8)}</span>
+                <Link to={`/users/${m.user_id}`} className="community__member-id">
+                  {m.user_id.slice(0, 8)}
+                </Link>
                 <span className="community__member-role">{m.role}</span>
               </li>
             ))}

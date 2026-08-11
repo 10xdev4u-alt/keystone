@@ -2788,7 +2788,9 @@
             "description": "Updated profile",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileView"
+                }
               }
             }
           },
@@ -5543,7 +5545,9 @@
             "description": "Profile",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
               }
             }
           },
@@ -6206,6 +6210,51 @@
           }
         }
       },
+      "EducationView": {
+        "type": "object",
+        "required": [
+          "id",
+          "school",
+          "start_year"
+        ],
+        "properties": {
+          "degree": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_year": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "school": {
+            "type": "string"
+          },
+          "start_year": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "EventList": {
         "type": "object",
         "description": "Paged events response.",
@@ -6312,6 +6361,55 @@
               "null"
             ],
             "format": "uuid"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "ExperienceView": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "start_date",
+          "current"
+        ],
+        "properties": {
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organization_id": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "start_date": {
             "type": "string",
@@ -6900,6 +6998,65 @@
           }
         }
       },
+      "ProfileResponse": {
+        "type": "object",
+        "required": [
+          "profile",
+          "education",
+          "experience",
+          "skills"
+        ],
+        "properties": {
+          "education": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EducationView"
+            }
+          },
+          "experience": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExperienceView"
+            }
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileView"
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkillView"
+            }
+          }
+        }
+      },
+      "ProfileView": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "visibility"
+        ],
+        "properties": {
+          "bio": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          }
+        }
+      },
       "QuestionRequest": {
         "type": "object",
         "required": [
@@ -7229,6 +7386,21 @@
         }
       },
       "SkillRequest": {
+        "type": "object",
+        "required": [
+          "skill",
+          "level"
+        ],
+        "properties": {
+          "level": {
+            "type": "string"
+          },
+          "skill": {
+            "type": "string"
+          }
+        }
+      },
+      "SkillView": {
         "type": "object",
         "required": [
           "skill",

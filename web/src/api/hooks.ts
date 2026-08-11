@@ -31,6 +31,9 @@ type EventList = components["schemas"]["EventList"];
 type OrgList = components["schemas"]["OrgList"];
 type OrgDetailResponse = components["schemas"]["OrgDetailResponse"];
 type SearchResponse = components["schemas"]["SearchResponse"];
+type ProfileResponse = components["schemas"]["ProfileResponse"];
+type ProfileView = components["schemas"]["ProfileView"];
+type SetProfileRequest = components["schemas"]["SetProfileRequest"];
 
 /**
  * Caller-facing options for query wrapper hooks. The hook owns `queryKey` and
@@ -421,7 +424,7 @@ export function useOrg(
 
 export function useProfile(
   userId: string,
-  options?: UseQueryOptions<unknown, ApiRequestError>,
+  options?: QueryOptions<ProfileResponse>,
 ) {
   return useQuery({
     queryKey: ["profiles", userId],
@@ -430,9 +433,33 @@ export function useProfile(
         params: { path: { user_id: userId } },
       });
       if (error) throw error;
+      if (!data) throw new Error("Empty profile response");
       return data;
     },
     enabled: Boolean(userId),
+    staleTime: 30_000,
     ...options,
+  });
+}
+
+/** Update the caller's own profile (bio, location, visibility). */
+export function useUpdateProfile(
+  options?: UseMutationOptions<ProfileView, ApiRequestError, SetProfileRequest>,
+) {
+  const qc = useQueryClient();
+  const { onSuccess: userOnSuccess, ...rest } = options ?? {};
+  return useMutation({
+    ...rest,
+    mutationFn: async (body) => {
+      const { data, error } = await client.PUT("/api/v1/me/profile", { body });
+      if (error) throw error;
+      if (!data) throw new Error("Empty profile update response");
+      return data;
+    },
+    onSuccess: (data, vars, ctx, mutation) => {
+      qc.invalidateQueries({ queryKey: ["profiles"] });
+      qc.invalidateQueries({ queryKey: ["me"] });
+      userOnSuccess?.(data, vars, ctx, mutation);
+    },
   });
 }

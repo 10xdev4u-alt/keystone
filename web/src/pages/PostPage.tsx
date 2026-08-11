@@ -114,7 +114,9 @@ export function PostPage() {
                 {thread?.comments.map((c) => (
                   <li key={c.id} className="comment">
                     <div className="comment__head">
-                      <span className="comment__author">{c.author_id.slice(0, 8)}</span>
+                      <Link to={`/users/${c.author_id}`} className="comment__author">
+                        {c.author_id.slice(0, 8)}
+                      </Link>
                       <time className="comment__time" dateTime={c.created_at}>
                         {timeAgo(c.created_at)}
                       </time>

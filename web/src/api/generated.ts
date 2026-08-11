@@ -2276,6 +2276,17 @@ export interface components {
             /** Format: int32 */
             start_year: number;
         };
+        EducationView: {
+            degree?: string | null;
+            description?: string | null;
+            /** Format: int32 */
+            end_year?: number | null;
+            field?: string | null;
+            id: string;
+            school: string;
+            /** Format: int32 */
+            start_year: number;
+        };
         /** @description Paged events response. */
         EventList: {
             events: components["schemas"]["EventView"][];
@@ -2301,6 +2312,18 @@ export interface components {
             /** Format: date */
             end_date?: string | null;
             /** Format: uuid */
+            organization_id?: string | null;
+            /** Format: date */
+            start_date: string;
+            title: string;
+        };
+        ExperienceView: {
+            company?: string | null;
+            current: boolean;
+            description?: string | null;
+            /** Format: date */
+            end_date?: string | null;
+            id: string;
             organization_id?: string | null;
             /** Format: date */
             start_date: string;
@@ -2477,6 +2500,18 @@ export interface components {
             /** Format: int64 */
             size_bytes: number;
         };
+        ProfileResponse: {
+            education: components["schemas"]["EducationView"][];
+            experience: components["schemas"]["ExperienceView"][];
+            profile: components["schemas"]["ProfileView"];
+            skills: components["schemas"]["SkillView"][];
+        };
+        ProfileView: {
+            bio?: string | null;
+            location?: string | null;
+            user_id: string;
+            visibility: string;
+        };
         QuestionRequest: {
             correct_response?: string | null;
             /** Format: int32 */
@@ -2575,6 +2610,10 @@ export interface components {
             username?: string | null;
         };
         SkillRequest: {
+            level: string;
+            skill: string;
+        };
+        SkillView: {
             level: string;
             skill: string;
         };
@@ -4993,7 +5032,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ProfileView"];
                 };
             };
             /** @description Missing or invalid access token */
@@ -7275,7 +7314,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ProfileResponse"];
                 };
             };
             /** @description Profile not found or hidden */

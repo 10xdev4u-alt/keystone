@@ -40,6 +40,9 @@ const OrgPage = lazy(() =>
 const SearchPage = lazy(() =>
   import("../pages/SearchPage").then((m) => ({ default: m.SearchPage })),
 );
+const ProfilePage = lazy(() =>
+  import("../pages/ProfilePage").then((m) => ({ default: m.ProfilePage })),
+);
 const LoginPage = lazy(() =>
   import("../pages/auth/LoginPage").then((m) => ({ default: m.LoginPage })),
 );
@@ -82,6 +85,7 @@ export const routesConfig: RouteObject[] = [
       { path: "/orgs", element: withSuspense(<OrgsPage />) },
       { path: "/orgs/:slug", element: withSuspense(<OrgPage />) },
       { path: "/search", element: withSuspense(<SearchPage />) },
+      { path: "/users/:userId", element: withSuspense(<ProfilePage />) },
       { path: "/courses", element: withSuspense(<Placeholder title="Courses" />) },
       { path: "/login", element: withSuspense(<LoginPage />) },
       { path: "/register", element: withSuspense(<RegisterPage />) },
