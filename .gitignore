@@ -12,6 +12,7 @@
 # ── Internal planning & published reports (never committed) ─────────────────
 PLAN.md
 *.html
+!web/index.html
 
 # ── Frontend (built later) ───────────────────────────────────────────────────
 frontend/node_modules
