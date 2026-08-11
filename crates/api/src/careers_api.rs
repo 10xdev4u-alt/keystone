@@ -24,9 +24,10 @@ use keystone_db::repositories::careers::{Careers, SalarySubmission};
 use keystone_db::repositories::organizations::Organizations;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct SalarySubmitRequest {
     pub role: String,
     pub location: Option<String>,
@@ -34,38 +35,38 @@ pub struct SalarySubmitRequest {
     pub amount: i64,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct SalaryQuery {
     pub role: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct VendorRequest {
     pub category: String,
     pub description: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct AlertRequest {
     pub kind: String,
     pub severity: String,
     pub message: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct CareerPathRequest {
     pub title: String,
     pub description: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct StepRequest {
     pub position: i32,
     pub title: String,
     pub description: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct AssessmentRequest {
     pub career_path_id: Uuid,
     pub score: i32,
@@ -77,6 +78,18 @@ pub struct AssessmentRequest {
 /// Submit one anonymized salary data point. Nothing user-identifying is
 /// written — the bucket row only ever carries bounds + count. Sub-threshold
 /// buckets stay unreadable, so even the writer cannot deanonymize.
+/// Submit an anonymized salary data point.
+#[utoipa::path(
+    post,
+    path = "/api/v1/salaries",
+    request_body = SalarySubmitRequest,
+    responses(
+        (status = 201, description = "Submission merged into aggregate", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "careers"
+)]
 pub async fn submit_salary(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -112,6 +125,16 @@ pub async fn submit_salary(
 }
 
 /// Readable buckets for a role — sub-threshold buckets are absent by design.
+/// Aggregated salary ranges for a role (anonymized, bucketed).
+#[utoipa::path(
+    get,
+    path = "/api/v1/salaries/search",
+    params(("role" = String, Query, description = "Role title")),
+    responses(
+        (status = 200, description = "Salary aggregates", body = Value),
+    ),
+    tag = "careers"
+)]
 pub async fn salaries_for_role(
     State(state): State<AppState>,
     Query(query): Query<SalaryQuery>,
@@ -139,6 +162,20 @@ fn bucket_json(bucket: &keystone_db::repositories::careers::SalaryBenchmark) -> 
 // ── Vendors ─────────────────────────────────────────────────────────────────
 
 /// Manage (create) vendor listings — org admins/owners only.
+/// Add a vendor listing to an organization. Org admin/owner only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/orgs/{slug}/vendors",
+    request_body = VendorRequest,
+    params(("slug" = String, Path, description = "Organization slug")),
+    responses(
+        (status = 201, description = "Vendor added", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not an org admin"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "careers"
+)]
 pub async fn add_vendor(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -158,6 +195,16 @@ pub async fn add_vendor(
     ))
 }
 
+/// List an organization's verified vendor listings.
+#[utoipa::path(
+    get,
+    path = "/api/v1/orgs/{slug}/vendors",
+    params(("slug" = String, Path, description = "Organization slug")),
+    responses(
+        (status = 200, description = "Vendors", body = Value),
+    ),
+    tag = "careers"
+)]
 pub async fn list_vendors(
     State(state): State<AppState>,
     Path(slug): Path<String>,
@@ -179,6 +226,22 @@ pub async fn list_vendors(
     Ok(Json(json!({ "vendors": items })))
 }
 
+/// Verify a vendor listing. Org admin/owner only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/orgs/{slug}/vendors/{listing_id}/verify",
+    params(
+        ("slug" = String, Path, description = "Organization slug"),
+        ("listing_id" = Uuid, Path, description = "Vendor listing id"),
+    ),
+    responses(
+        (status = 204, description = "Vendor verified"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not an org admin"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "careers"
+)]
 pub async fn verify_vendor(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -197,6 +260,22 @@ pub async fn verify_vendor(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Remove a vendor listing. Org admin/owner only.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/orgs/{slug}/vendors/{listing_id}",
+    params(
+        ("slug" = String, Path, description = "Organization slug"),
+        ("listing_id" = Uuid, Path, description = "Vendor listing id"),
+    ),
+    responses(
+        (status = 204, description = "Vendor removed"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not an org admin"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "careers"
+)]
 pub async fn remove_vendor(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -217,6 +296,20 @@ pub async fn remove_vendor(
 
 // ── Compliance alerts ───────────────────────────────────────────────────────
 
+/// Create a compliance alert for an organization. Org admin/owner only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/orgs/{slug}/alerts",
+    request_body = AlertRequest,
+    params(("slug" = String, Path, description = "Organization slug")),
+    responses(
+        (status = 201, description = "Alert created", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not an org admin"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "careers"
+)]
 pub async fn add_alert(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -236,6 +329,16 @@ pub async fn add_alert(
     ))
 }
 
+/// List an organization's compliance alerts.
+#[utoipa::path(
+    get,
+    path = "/api/v1/orgs/{slug}/alerts",
+    params(("slug" = String, Path, description = "Organization slug")),
+    responses(
+        (status = 200, description = "Alerts", body = Value),
+    ),
+    tag = "careers"
+)]
 pub async fn list_alerts(
     State(state): State<AppState>,
     Path(slug): Path<String>,
@@ -259,6 +362,22 @@ pub async fn list_alerts(
     Ok(Json(json!({ "alerts": items })))
 }
 
+/// Resolve a compliance alert. Org admin/owner only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/orgs/{slug}/alerts/{alert_id}/resolve",
+    params(
+        ("slug" = String, Path, description = "Organization slug"),
+        ("alert_id" = Uuid, Path, description = "Alert id"),
+    ),
+    responses(
+        (status = 204, description = "Alert resolved"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not an org admin"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "careers"
+)]
 pub async fn resolve_alert(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -279,6 +398,15 @@ pub async fn resolve_alert(
 
 // ── Career paths & self-assessments ─────────────────────────────────────────
 
+/// List all career paths.
+#[utoipa::path(
+    get,
+    path = "/api/v1/career-paths",
+    responses(
+        (status = 200, description = "Career paths", body = Value),
+    ),
+    tag = "careers"
+)]
 pub async fn list_career_paths(State(state): State<AppState>) -> ApiResult<Json<Value>> {
     let careers = Careers::new(state.pool.clone());
     let rows = careers.career_paths().await.map_err(map_repo_error)?;
@@ -289,6 +417,18 @@ pub async fn list_career_paths(State(state): State<AppState>) -> ApiResult<Json<
     Ok(Json(json!({ "career_paths": items })))
 }
 
+/// Create a career path.
+#[utoipa::path(
+    post,
+    path = "/api/v1/career-paths",
+    request_body = CareerPathRequest,
+    responses(
+        (status = 201, description = "Career path created", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "careers"
+)]
 pub async fn create_career_path(
     State(state): State<AppState>,
     _auth_user: AuthUser,
@@ -305,6 +445,19 @@ pub async fn create_career_path(
     ))
 }
 
+/// Add a step to a career path.
+#[utoipa::path(
+    post,
+    path = "/api/v1/career-paths/{path_id}",
+    request_body = StepRequest,
+    params(("path_id" = Uuid, Path, description = "Career path id")),
+    responses(
+        (status = 201, description = "Step added", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "careers"
+)]
 pub async fn add_step(
     State(state): State<AppState>,
     _auth_user: AuthUser,
@@ -327,6 +480,17 @@ pub async fn add_step(
     ))
 }
 
+/// Fetch a career path with its steps.
+#[utoipa::path(
+    get,
+    path = "/api/v1/career-paths/{path_id}",
+    params(("path_id" = Uuid, Path, description = "Career path id")),
+    responses(
+        (status = 200, description = "Career path + steps", body = Value),
+        (status = 404, description = "Career path not found"),
+    ),
+    tag = "careers"
+)]
 pub async fn get_career_path(
     State(state): State<AppState>,
     Path(path_id): Path<Uuid>,
@@ -348,6 +512,18 @@ pub async fn get_career_path(
     ))
 }
 
+/// Submit a self-assessment against a career step.
+#[utoipa::path(
+    post,
+    path = "/api/v1/me/assessments",
+    request_body = AssessmentRequest,
+    responses(
+        (status = 201, description = "Assessment recorded", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "careers"
+)]
 pub async fn add_assessment(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -372,6 +548,17 @@ pub async fn add_assessment(
     ))
 }
 
+/// The caller's self-assessments.
+#[utoipa::path(
+    get,
+    path = "/api/v1/me/assessments",
+    responses(
+        (status = 200, description = "Assessments", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "careers"
+)]
 pub async fn my_assessments(
     State(state): State<AppState>,
     auth_user: AuthUser,
