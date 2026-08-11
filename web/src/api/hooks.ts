@@ -36,6 +36,9 @@ type ProfileResponse = components["schemas"]["ProfileResponse"];
 type ProfileView = components["schemas"]["ProfileView"];
 type SetProfileRequest = components["schemas"]["SetProfileRequest"];
 type SessionListResponse = components["schemas"]["SessionListResponse"];
+type PreferencesResponse = components["schemas"]["PreferencesResponse"];
+type PreferencesRequest = components["schemas"]["PreferencesRequest"];
+type ChangePasswordRequest = components["schemas"]["ChangePasswordRequest"];
 type AdminStatusResponse = components["schemas"]["AdminStatusResponse"];
 type AdminUserList = components["schemas"]["AdminUserList"];
 type ReportQueueResponse = components["schemas"]["ReportQueueResponse"];
@@ -241,6 +244,59 @@ export function useRevokeAllSessions(
     onSuccess: (data, vars, ctx, mutation) => {
       qc.clear();
       setTokens(null, null);
+      options?.onSuccess?.(data, vars, ctx, mutation);
+    },
+  });
+}
+
+/** Change the caller's password (requires the current one; revokes other sessions). */
+export function useChangePassword(
+  options?: UseMutationOptions<void, ApiRequestError, ChangePasswordRequest>,
+) {
+  return useMutation({
+    ...options,
+    mutationFn: async (body) => {
+      const { error } = await client.POST("/api/v1/auth/change-password", { body });
+      if (error) throw error;
+    },
+  });
+}
+
+/** The caller's notification preferences. */
+export function useNotificationPreferences(
+  options?: QueryOptions<PreferencesResponse>,
+) {
+  return useQuery({
+    queryKey: ["notifications", "preferences"],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/notifications/preferences");
+      if (error) throw error;
+      if (!data) throw new Error("Empty preferences response");
+      return data;
+    },
+    ...options,
+  });
+}
+
+/** Update notification preferences. */
+export function useUpdateNotificationPreferences(
+  options?: UseMutationOptions<
+    PreferencesResponse,
+    ApiRequestError,
+    Partial<PreferencesRequest>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    ...options,
+    mutationFn: async (body) => {
+      const { data, error } = await client.PUT("/api/v1/notifications/preferences", { body });
+      if (error) throw error;
+      if (!data) throw new Error("Empty preferences response");
+      return data;
+    },
+    onSuccess: (data, vars, ctx, mutation) => {
+      qc.setQueryData(["notifications", "preferences"], data);
       options?.onSuccess?.(data, vars, ctx, mutation);
     },
   });

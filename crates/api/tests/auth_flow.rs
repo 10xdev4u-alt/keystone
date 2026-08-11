@@ -87,6 +87,18 @@ fn post_json(uri: &str, body: Value) -> Request<Body> {
         .expect("request must build")
 }
 
+/// POST with a Bearer token — for authenticated endpoints like
+/// change-password (no cookie pair required).
+fn post_json_auth(uri: &str, token: &str, body: Value) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .body(Body::from(body.to_string()))
+        .expect("request must build")
+}
+
 fn get(uri: &str, token: &str) -> Request<Body> {
     Request::builder()
         .uri(uri)
@@ -516,4 +528,124 @@ async fn password_reset_flow_replaces_hash_and_burns_token() {
         .await
         .unwrap();
     assert_eq!(replay.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn change_password_requires_current_and_revokes_other_sessions() {
+    let Some(app) = test_app().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+
+    // Register + verify + login → access token + refresh cookie.
+    let reg = app
+        .clone()
+        .oneshot(post_json(
+            "/api/v1/auth/register",
+            serde_json::json!({
+                "email": "change-pw@example.com",
+                "password": "correct-horse-battery-staple",
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(reg.status(), StatusCode::CREATED);
+    let verify_token = json_body(reg).await["verification_token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    app.clone()
+        .oneshot(post_json(
+            "/api/v1/auth/verify-email",
+            serde_json::json!({ "token": verify_token }),
+        ))
+        .await
+        .unwrap();
+    let login = app
+        .clone()
+        .oneshot(post_json(
+            "/api/v1/auth/login",
+            serde_json::json!({
+                "email": "change-pw@example.com",
+                "password": "correct-horse-battery-staple",
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(login.status(), StatusCode::OK);
+    let access_token = json_body(login).await["access_token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    // Wrong current password → 401.
+    let wrong = app
+        .clone()
+        .oneshot(post_json_auth(
+            "/api/v1/auth/change-password",
+            &access_token,
+            serde_json::json!({
+                "current_password": "not-the-password",
+                "new_password": "brand-new-password-789",
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(wrong.status(), StatusCode::UNAUTHORIZED);
+
+    // Weak new password → 400.
+    let weak = app
+        .clone()
+        .oneshot(post_json_auth(
+            "/api/v1/auth/change-password",
+            &access_token,
+            serde_json::json!({
+                "current_password": "correct-horse-battery-staple",
+                "new_password": "short",
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(weak.status(), StatusCode::BAD_REQUEST);
+
+    // Correct change → 200, old password dead, new password logs in.
+    let changed = app
+        .clone()
+        .oneshot(post_json_auth(
+            "/api/v1/auth/change-password",
+            &access_token,
+            serde_json::json!({
+                "current_password": "correct-horse-battery-staple",
+                "new_password": "brand-new-password-789",
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(changed.status(), StatusCode::OK);
+
+    let old_login = app
+        .clone()
+        .oneshot(post_json(
+            "/api/v1/auth/login",
+            serde_json::json!({
+                "email": "change-pw@example.com",
+                "password": "correct-horse-battery-staple",
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(old_login.status(), StatusCode::UNAUTHORIZED);
+
+    let new_login = app
+        .clone()
+        .oneshot(post_json(
+            "/api/v1/auth/login",
+            serde_json::json!({
+                "email": "change-pw@example.com",
+                "password": "brand-new-password-789",
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(new_login.status(), StatusCode::OK);
 }

@@ -66,6 +66,12 @@ const ShieldIcon = (
     <path d="M8 1.5 13.5 4v4.5c0 3.2-2.2 5.2-5.5 6-3.3-.8-5.5-2.8-5.5-6V4L8 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
   </svg>
 );
+const SettingsIcon = (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <circle cx="8" cy="8" r="2.4" stroke="currentColor" strokeWidth="1.3" />
+    <path d="M8 1.6v1.9M8 12.5v1.9M1.6 8h1.9M12.5 8h1.9M3.5 3.5l1.3 1.3M11.2 11.2l1.3 1.3M12.5 3.5l-1.3 1.3M4.8 11.2l-1.3 1.3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+  </svg>
+);
 const UserIcon = (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
     <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.3" />
@@ -91,6 +97,7 @@ export const appNav: NavItem[] = [
   { label: "Files", path: "/me/files", icon: PostIcon },
   { label: "Profile", path: "/me/profile", icon: UserIcon },
   { label: "Sessions", path: "/me/sessions", icon: ShieldIcon },
+  { label: "Settings", path: "/me/settings", icon: SettingsIcon },
 ];
 
 /** Staff-only admin shell nav. */

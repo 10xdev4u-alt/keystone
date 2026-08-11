@@ -9,6 +9,8 @@ import { RouteErrorBoundary } from "./ErrorBoundary";
 // The real homepage hits the network via usePosts; stub it so shell tests
 // assert routing, not data fetching.
 vi.mock("../api/hooks", () => ({
+  useCurrentUser: vi.fn(() => ({ data: undefined, isPending: false, error: null })),
+  useLogout: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
   usePosts: vi.fn(() => ({
     data: { posts: [], limit: 20, next_cursor: null },
     isLoading: false,

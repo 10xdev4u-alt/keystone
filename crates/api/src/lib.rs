@@ -78,6 +78,7 @@ pub fn router(state: AppState) -> Router {
             state.clone(),
             middleware::rate_limit_auth,
         ))
+        .route("/api/v1/auth/change-password", post(auth::change_password))
         // Cookie-authenticated routes get the double-submit CSRF guard in
         // their own sub-router so it never wraps credential-based routes
         // (register/login have no CSRF pair yet). The guard is strict: any
