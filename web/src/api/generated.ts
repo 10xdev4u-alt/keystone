@@ -2461,6 +2461,15 @@ export interface components {
             /** Format: int32 */
             start_year: number;
         };
+        /**
+         * @description Full event detail: the card fields + speakers and the caller's
+         *     registration status (registered / waitlisted / null).
+         */
+        EventDetailResponse: {
+            event: components["schemas"]["EventView"];
+            my_registration?: string | null;
+            speakers: string[];
+        };
         /** @description Paged events response. */
         EventList: {
             events: components["schemas"]["EventView"][];
@@ -4811,7 +4820,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EventDetailResponse"];
                 };
             };
             /** @description Event not found */

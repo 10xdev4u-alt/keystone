@@ -1198,7 +1198,7 @@ pub async fn list_events(
     path = "/api/v1/events/{slug}",
     params(("slug" = String, Path, description = "Event slug")),
     responses(
-        (status = 200, description = "Event", body = Value),
+        (status = 200, description = "Event", body = EventDetailResponse),
         (status = 404, description = "Event not found"),
     ),
     tag = "learning"
@@ -1207,7 +1207,7 @@ pub async fn get_event(
     State(state): State<AppState>,
     maybe: MaybeUser,
     Path(slug): Path<String>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<EventDetailResponse>> {
     let events = Events::new(state.pool.clone());
     let event = events
         .get_by_slug(&slug)
@@ -1222,11 +1222,11 @@ pub async fn get_event(
             .map_err(map_repo_error)?,
         None => None,
     };
-    Ok(Json(json!({
-        "event": event_json(&event),
-        "speakers": speakers.iter().map(|u| u.to_string()).collect::<Vec<_>>(),
-        "my_registration": my_status,
-    })))
+    Ok(Json(EventDetailResponse {
+        event: event_json(&event),
+        speakers: speakers.iter().map(|u| u.to_string()).collect(),
+        my_registration: my_status,
+    }))
 }
 
 /// Register for an event (or join its waitlist when full).
@@ -1360,6 +1360,15 @@ pub struct EventView {
 #[derive(Debug, serde::Serialize, ToSchema)]
 pub struct EventList {
     pub events: Vec<EventView>,
+}
+
+/// Full event detail: the card fields + speakers and the caller's
+/// registration status (registered / waitlisted / null).
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct EventDetailResponse {
+    pub event: EventView,
+    pub speakers: Vec<String>,
+    pub my_registration: Option<String>,
 }
 
 fn event_json(event: &keystone_db::repositories::events::Event) -> EventView {

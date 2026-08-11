@@ -50,6 +50,13 @@ vi.mock("../api/hooks", () => ({
     error: null,
     refetch: vi.fn(),
   })),
+  useEvent: vi.fn(() => ({
+    data: undefined,
+    isLoading: false,
+    isError: true,
+    error: new Error("stub"),
+    refetch: vi.fn(),
+  })),
   useCommunities: vi.fn(() => ({
     data: { communities: [] },
     isLoading: false,

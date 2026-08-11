@@ -27,6 +27,9 @@ const MessagesPage = lazy(() =>
 const MyProfileRedirect = lazy(() =>
   import("../pages/MyProfilePage").then((m) => ({ default: m.MyProfilePage })),
 );
+const EventPage = lazy(() =>
+  import("../pages/EventPage").then((m) => ({ default: m.EventPage })),
+);
 
 const HomePage = lazy(() =>
   import("../pages/HomePage").then((m) => ({ default: m.HomePage })),
@@ -114,7 +117,7 @@ export const routesConfig: RouteObject[] = [
       { path: "/communities", element: withSuspense(<CommunitiesPage />) },
       { path: "/communities/:slug", element: withSuspense(<CommunityPage />) },
       { path: "/events", element: withSuspense(<EventsPage />) },
-      { path: "/events/:slug", element: withSuspense(<Placeholder title="Event" />) },
+      { path: "/events/:slug", element: withSuspense(<EventPage />) },
       { path: "/orgs", element: withSuspense(<OrgsPage />) },
       { path: "/orgs/:slug", element: withSuspense(<OrgPage />) },
       { path: "/search", element: withSuspense(<SearchPage />) },
