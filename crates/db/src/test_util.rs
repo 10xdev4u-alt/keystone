@@ -103,6 +103,13 @@ pub async fn test_pool() -> Option<PgPool> {
 /// (parallel-safe, unlike [`test_pool`] which shares `public`). Returns `None`
 /// when the database is unavailable.
 pub async fn test_pool_isolated() -> Option<PgPool> {
+    test_pool_isolated_with(2).await
+}
+
+/// Like [`test_pool_isolated`] but with a caller-chosen connection cap.
+/// Concurrency tests (advisory-lock races, quota races) need one connection
+/// per racer — the default 2 would serialize racers and mask real behavior.
+pub async fn test_pool_isolated_with(max_connections: u32) -> Option<PgPool> {
     let url = std::env::var("TEST_DATABASE_URL").ok()?;
     let admin = PgPoolOptions::new()
         .max_connections(1)
@@ -121,8 +128,8 @@ pub async fn test_pool_isolated() -> Option<PgPool> {
 
     let owned = schema.clone();
     let pool = PgPoolOptions::new()
-        .max_connections(2)
-        .acquire_timeout(std::time::Duration::from_secs(5))
+        .max_connections(max_connections)
+        .acquire_timeout(std::time::Duration::from_secs(10))
         .after_connect(move |connection, _| {
             let schema = owned.clone();
             Box::pin(async move {

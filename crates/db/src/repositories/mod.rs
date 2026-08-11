@@ -14,6 +14,7 @@ pub mod communities;
 pub mod community_posts;
 pub mod credits;
 pub mod events;
+pub mod files;
 pub mod learning;
 pub mod links;
 pub mod mentorship;

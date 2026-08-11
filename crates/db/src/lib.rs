@@ -4,7 +4,9 @@
 #![forbid(unsafe_code)]
 
 pub mod event_bus;
+pub mod jobs;
 pub mod search;
+pub mod storage;
 
 pub use sqlx;
 
