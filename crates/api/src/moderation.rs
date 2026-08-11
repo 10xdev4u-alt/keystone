@@ -17,6 +17,7 @@ use keystone_db::repositories::reports::{NewReport, Reports};
 use keystone_db::repositories::reviews::{NewReview, Reviews};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 const REASON_MAX: usize = 500;
@@ -36,7 +37,7 @@ fn validate_text(value: &str, what: &str, max: usize) -> Result<(), ApiError> {
     Ok(())
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ReportQueueQuery {
     #[serde(default = "default_limit")]
     pub limit: i64,
@@ -51,6 +52,18 @@ fn default_limit() -> i64 {
 // ── Reports ────────────────────────────────────────────────────────────────
 
 #[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, entity = %req.entity_type))]
+/// File a moderation report against content or a user.
+#[utoipa::path(
+    post,
+    path = "/api/v1/reports",
+    request_body = CreateReportRequest,
+    responses(
+        (status = 201, description = "Report filed", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "moderation"
+)]
 pub async fn file_report(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -104,6 +117,18 @@ pub async fn file_report(
     ))
 }
 
+/// Staff queue of open reports.
+#[utoipa::path(
+    get,
+    path = "/api/v1/moderation/reports",
+    responses(
+        (status = 200, description = "Open reports", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not a moderator"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "moderation"
+)]
 pub async fn report_queue(
     State(state): State<AppState>,
     _auth_user: AuthUser, // guarded by require_moderator at the router
@@ -140,6 +165,20 @@ pub async fn report_queue(
 }
 
 #[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, report_id = %id))]
+/// Resolve a report with a moderation action. Staff only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/moderation/reports/{id}/resolve",
+    request_body = ResolveReportRequest,
+    params(("id" = Uuid, Path, description = "Report id")),
+    responses(
+        (status = 200, description = "Resolution + action recorded", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not a moderator"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "moderation"
+)]
 pub async fn resolve_report(
     State(state): State<AppState>,
     auth_user: AuthUser, // guarded by require_moderator at the router
@@ -203,6 +242,18 @@ pub async fn resolve_report(
 // ── Reviews ────────────────────────────────────────────────────────────────
 
 #[tracing::instrument(skip(state, auth_user), fields(actor = %auth_user.user_id, entity = %req.entity_type))]
+/// Create or update a review of an entity (one per user per entity).
+#[utoipa::path(
+    put,
+    path = "/api/v1/reviews",
+    request_body = UpsertReviewRequest,
+    responses(
+        (status = 200, description = "Review upserted", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "moderation"
+)]
 pub async fn upsert_review(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -267,6 +318,15 @@ pub async fn upsert_review(
     ))
 }
 
+/// Reviews for an entity.
+#[utoipa::path(
+    get,
+    path = "/api/v1/reviews",
+    responses(
+        (status = 200, description = "Reviews", body = Value),
+    ),
+    tag = "moderation"
+)]
 pub async fn list_reviews(
     State(state): State<AppState>,
     Query(query): Query<crate::content::ReviewQuery>,

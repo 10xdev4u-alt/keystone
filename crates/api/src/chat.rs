@@ -23,6 +23,7 @@ use serde_json::{json, Value as JsonValue};
 use std::collections::VecDeque;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 /// Sliding-window rate gate for WS message sends.
@@ -60,7 +61,7 @@ impl MessageGate {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateConversationRequest {
     #[serde(rename = "type")]
     pub kind: String,
@@ -71,6 +72,18 @@ pub struct CreateConversationRequest {
     pub member_ids: Option<Vec<Uuid>>,
 }
 
+/// Create (or fetch) a direct-message conversation with another user.
+#[utoipa::path(
+    post,
+    path = "/api/v1/conversations",
+    request_body = CreateConversationRequest,
+    responses(
+        (status = 201, description = "Conversation created or existing", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "realtime"
+)]
 pub async fn create_conversation(
     State(state): State<AppState>,
     user: AuthUser,
@@ -123,6 +136,17 @@ pub async fn create_conversation(
         .into_response())
 }
 
+/// The caller's conversations (latest message first).
+#[utoipa::path(
+    get,
+    path = "/api/v1/conversations",
+    responses(
+        (status = 200, description = "Conversations", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "realtime"
+)]
 pub async fn list_conversations(
     State(state): State<AppState>,
     user: AuthUser,
@@ -149,12 +173,24 @@ pub async fn list_conversations(
     Ok(Json(json!({ "conversations": items })))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct MessagesQuery {
     pub before: Option<DateTime<Utc>>,
     pub limit: Option<i64>,
 }
 
+/// Messages in a conversation (cursor-paged).
+#[utoipa::path(
+    get,
+    path = "/api/v1/conversations/{id}/messages",
+    params(("id" = Uuid, Path, description = "Conversation id")),
+    responses(
+        (status = 200, description = "Messages", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "realtime"
+)]
 pub async fn list_messages(
     State(state): State<AppState>,
     user: AuthUser,
@@ -188,13 +224,26 @@ pub async fn list_messages(
     Ok(Json(json!({ "messages": items })))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct SendMessageRequest {
     pub body: String,
 }
 
 /// REST write path — identical semantics to the WS path (persist first, then
 /// fan out), so clients without a socket can still participate.
+/// Send a message to a conversation (fans out over websockets).
+#[utoipa::path(
+    post,
+    path = "/api/v1/conversations/{id}/messages",
+    request_body = SendMessageRequest,
+    params(("id" = Uuid, Path, description = "Conversation id")),
+    responses(
+        (status = 201, description = "Message sent", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "realtime"
+)]
 pub async fn send_message(
     State(state): State<AppState>,
     user: AuthUser,
@@ -222,6 +271,18 @@ pub async fn send_message(
         .into_response())
 }
 
+/// Mark a conversation read by the caller.
+#[utoipa::path(
+    post,
+    path = "/api/v1/conversations/{id}/read",
+    params(("id" = Uuid, Path, description = "Conversation id")),
+    responses(
+        (status = 200, description = "Unread state", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "realtime"
+)]
 pub async fn mark_read(
     State(state): State<AppState>,
     user: AuthUser,
@@ -244,6 +305,18 @@ pub async fn mark_read(
     ))
 }
 
+/// Online presence for a conversation's participants.
+#[utoipa::path(
+    get,
+    path = "/api/v1/conversations/{id}/presence",
+    params(("id" = Uuid, Path, description = "Conversation id")),
+    responses(
+        (status = 200, description = "Presence map", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "realtime"
+)]
 pub async fn conversation_presence(
     State(state): State<AppState>,
     user: AuthUser,
@@ -282,6 +355,18 @@ pub async fn conversation_presence(
 ///
 /// Auth + membership are checked BEFORE the upgrade — a non-member never
 /// reaches the socket.
+/// Upgrade to the chat websocket for a conversation.
+#[utoipa::path(
+    get,
+    path = "/api/v1/ws/chat/{id}",
+    params(("id" = Uuid, Path, description = "Conversation id")),
+    responses(
+        (status = 101, description = "Websocket upgraded"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "realtime"
+)]
 pub async fn chat_socket(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,

@@ -36,6 +36,7 @@ use std::convert::Infallible;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::sync::broadcast;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 /// An activity-feed event for one user (mirrors the `notifications` row).
@@ -164,6 +165,17 @@ pub(crate) async fn notify(pool: &PgPool, hub: &RealtimeHub, n: Notify<'_>) {
 ///
 /// Gap recovery: send `Last-Event-ID: <notification-id>`; everything newer is
 /// replayed from the database before the live stream chains on.
+/// Server-Sent Events stream of the caller's notifications.
+#[utoipa::path(
+    get,
+    path = "/api/v1/notifications/feed",
+    responses(
+        (status = 200, description = "SSE notification stream", content_type = "text/event-stream"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "realtime"
+)]
 pub async fn notifications_feed(
     State(state): State<AppState>,
     user: AuthUser,
@@ -243,12 +255,23 @@ pub async fn notifications_feed(
 
 // ── Notifications REST ──────────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ListQuery {
     pub before: Option<i64>,
     pub limit: Option<i64>,
 }
 
+/// The caller's notification list (paged).
+#[utoipa::path(
+    get,
+    path = "/api/v1/notifications",
+    responses(
+        (status = 200, description = "Notifications", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "realtime"
+)]
 pub async fn list_notifications(
     State(state): State<AppState>,
     user: AuthUser,
@@ -296,6 +319,17 @@ pub async fn list_notifications(
     ))
 }
 
+/// The caller's unread notification count.
+#[utoipa::path(
+    get,
+    path = "/api/v1/notifications/unread-count",
+    responses(
+        (status = 200, description = "Unread count", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "realtime"
+)]
 pub async fn unread_count(
     State(state): State<AppState>,
     user: AuthUser,
@@ -308,12 +342,24 @@ pub async fn unread_count(
     Ok(Json(json!({ "unread": count })))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct MarkReadRequest {
     /// Mark everything up to this id as read. `null` = mark all.
     pub up_to: Option<i64>,
 }
 
+/// Mark notifications read (by id, or all when ids are empty).
+#[utoipa::path(
+    post,
+    path = "/api/v1/notifications/read",
+    request_body = MarkReadRequest,
+    responses(
+        (status = 200, description = "Updated unread state", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "realtime"
+)]
 pub async fn mark_read(
     State(state): State<AppState>,
     user: AuthUser,
@@ -339,7 +385,7 @@ pub async fn mark_read(
     Ok(Json(json!({ "read_cursor": cursor, "unread": unread })))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct PreferencesRequest {
     pub in_app: Option<bool>,
     pub digest: Option<bool>,
@@ -349,6 +395,17 @@ pub struct PreferencesRequest {
     pub quiet_hours_end: Option<i16>,
 }
 
+/// The caller's notification preferences.
+#[utoipa::path(
+    get,
+    path = "/api/v1/notifications/preferences",
+    responses(
+        (status = 200, description = "Preferences", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "realtime"
+)]
 pub async fn get_preferences(
     State(state): State<AppState>,
     user: AuthUser,
@@ -370,6 +427,18 @@ pub async fn get_preferences(
     })))
 }
 
+/// Update the caller's notification preferences.
+#[utoipa::path(
+    put,
+    path = "/api/v1/notifications/preferences",
+    request_body = PreferencesRequest,
+    responses(
+        (status = 200, description = "Updated preferences", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "realtime"
+)]
 pub async fn update_preferences(
     State(state): State<AppState>,
     user: AuthUser,

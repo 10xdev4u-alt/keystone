@@ -25,6 +25,7 @@ use keystone_db::repositories::files::{Files, NewFileRecord};
 use keystone_db::storage::make_thumbnail;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 // ── Validation limits ───────────────────────────────────────────────────────
@@ -74,14 +75,14 @@ fn safe_suffix(name: &str) -> String {
 
 // ── Requests ────────────────────────────────────────────────────────────────
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct PresignRequest {
     original_name: String,
     content_type: String,
     size_bytes: i64,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct RegisterRequest {
     /// Key returned by presign.
     key: String,
@@ -96,6 +97,18 @@ pub struct RegisterRequest {
 // ── Handlers ────────────────────────────────────────────────────────────────
 
 /// `POST /api/v1/files/presign` — mint a server-keyed PUT url.
+/// Get a presigned PUT URL for a direct-to-storage upload.
+#[utoipa::path(
+    post,
+    path = "/api/v1/files/presign",
+    request_body = PresignRequest,
+    responses(
+        (status = 200, description = "Presigned URL + upload params", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "files"
+)]
 pub async fn presign(
     State(state): State<AppState>,
     user: AuthUser,
@@ -143,6 +156,18 @@ pub async fn presign(
 
 /// `POST /api/v1/files` — register metadata after the bytes are in the bucket.
 /// Atomic quota enforcement + image thumbnail generation.
+/// Register an uploaded object (after the presigned PUT succeeds).
+#[utoipa::path(
+    post,
+    path = "/api/v1/files",
+    request_body = RegisterRequest,
+    responses(
+        (status = 200, description = "Registered file record", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "files"
+)]
 pub async fn register_file(
     State(state): State<AppState>,
     user: AuthUser,
@@ -231,7 +256,7 @@ pub async fn register_file(
     })))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct ListParams {
     before: Option<DateTime<Utc>>,
     #[serde(default = "default_limit")]
@@ -243,6 +268,17 @@ fn default_limit() -> i64 {
 }
 
 /// `GET /api/v1/files` — cursor-paged listing of the caller's files.
+/// The caller's registered files (paged).
+#[utoipa::path(
+    get,
+    path = "/api/v1/files",
+    responses(
+        (status = 200, description = "File list", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "files"
+)]
 pub async fn list_files(
     State(state): State<AppState>,
     user: AuthUser,
@@ -259,6 +295,19 @@ pub async fn list_files(
 /// `GET /api/v1/files/{id}` — metadata + a fresh presigned download url.
 /// Owner or public file; anyone else gets a 404 (existence is never
 /// confirmed to non-owners).
+/// Fetch a file record (owner or staff only).
+#[utoipa::path(
+    get,
+    path = "/api/v1/files/{id}",
+    params(("id" = Uuid, Path, description = "File id")),
+    responses(
+        (status = 200, description = "File record + download URL", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the owner and not staff"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "files"
+)]
 pub async fn get_file(
     State(state): State<AppState>,
     user: AuthUser,
@@ -295,6 +344,19 @@ pub async fn get_file(
 
 /// `DELETE /api/v1/files/{id}` — owner only. Metadata row is removed first;
 /// the object deletion in the bucket is best-effort.
+/// Delete a file record and its stored object. Owner or staff only.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/files/{id}",
+    params(("id" = Uuid, Path, description = "File id")),
+    responses(
+        (status = 200, description = "Deletion result", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the owner and not staff"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "files"
+)]
 pub async fn delete_file(
     State(state): State<AppState>,
     user: AuthUser,
