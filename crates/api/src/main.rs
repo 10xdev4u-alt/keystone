@@ -68,6 +68,7 @@ async fn main() -> anyhow::Result<()> {
         started_at: Instant::now(),
         auth,
         rate_limit: std::sync::Arc::new(keystone_api::middleware::RateLimiter::new()),
+        realtime: std::sync::Arc::new(keystone_api::realtime::RealtimeHub::new()),
         oauth,
     };
     let mut app = router(state);

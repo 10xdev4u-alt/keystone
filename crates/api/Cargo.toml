@@ -15,6 +15,7 @@ keystone-db = { path = "../db" }
 keystone-domain = { path = "../domain" }
 axum.workspace = true
 chrono.workspace = true
+futures.workspace = true
 tokio.workspace = true
 sqlx.workspace = true
 serde.workspace = true
@@ -26,7 +27,7 @@ uuid.workspace = true
 dotenvy.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
 url = "2"
 base64.workspace = true
 getrandom.workspace = true
@@ -37,3 +38,5 @@ sha2.workspace = true
 keystone-db = { path = "../db", features = ["test-util"] }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
+tokio-tungstenite = "0.26"
+http = "1"

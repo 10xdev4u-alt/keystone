@@ -10,6 +10,7 @@
 
 pub mod auth;
 pub mod careers_api;
+pub mod chat;
 pub mod content;
 pub mod csrf;
 pub mod error;
@@ -21,6 +22,7 @@ pub mod network;
 pub mod oauth;
 pub mod qa;
 pub mod rbac;
+pub mod realtime;
 pub mod social;
 
 use axum::extract::State;
@@ -44,6 +46,8 @@ pub struct AppState {
     pub started_at: Instant,
     pub auth: auth::AuthServices,
     pub rate_limit: Arc<middleware::RateLimiter>,
+    /// In-process realtime fan-out (SSE feeds + chat channels).
+    pub realtime: Arc<realtime::RealtimeHub>,
     /// OAuth login; `None` when no provider is configured (routes absent).
     pub oauth: Option<oauth::OAuthService>,
 }
@@ -384,6 +388,36 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/reviews",
             get(moderation::list_reviews).put(moderation::upsert_review),
         )
+        // ── Month 7: notifications + realtime ────────────────────────────
+        .route("/api/v1/notifications", get(realtime::list_notifications))
+        .route(
+            "/api/v1/notifications/feed",
+            get(realtime::notifications_feed),
+        )
+        .route(
+            "/api/v1/notifications/unread-count",
+            get(realtime::unread_count),
+        )
+        .route("/api/v1/notifications/read", post(realtime::mark_read))
+        .route(
+            "/api/v1/notifications/preferences",
+            get(realtime::get_preferences).put(realtime::update_preferences),
+        )
+        // ── Month 7: chat ────────────────────────────────────────────────
+        .route(
+            "/api/v1/conversations",
+            get(chat::list_conversations).post(chat::create_conversation),
+        )
+        .route(
+            "/api/v1/conversations/{id}/messages",
+            get(chat::list_messages).post(chat::send_message),
+        )
+        .route("/api/v1/conversations/{id}/read", post(chat::mark_read))
+        .route(
+            "/api/v1/conversations/{id}/presence",
+            get(chat::conversation_presence),
+        )
+        .route("/api/v1/ws/chat/{id}", get(chat::chat_socket))
         // ── Moderation (staff-only) ───────────────────────────────────────
         .merge(
             Router::new()
@@ -561,6 +595,7 @@ mod tests {
                 secure_cookies: false,
             },
             rate_limit: std::sync::Arc::new(crate::middleware::RateLimiter::new()),
+            realtime: std::sync::Arc::new(crate::realtime::RealtimeHub::new()),
             oauth: None,
         })
     }

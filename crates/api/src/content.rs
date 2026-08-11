@@ -587,6 +587,28 @@ pub async fn create_comment(
         None,
     )
     .await;
+    // Activity feed: notify the post author (not for self-comments).
+    if let Ok(Some(post)) = posts.get_by_id(post_id).await {
+        if post.author_id != auth_user.user_id {
+            crate::realtime::notify(
+                &state.pool,
+                &state.realtime,
+                crate::realtime::Notify {
+                    user_id: post.author_id,
+                    kind: "comment",
+                    actor_id: Some(auth_user.user_id),
+                    entity_type: "post",
+                    entity_id: Some(post_id),
+                    payload: serde_json::json!({
+                        "post_id": post_id.to_string(),
+                        "comment_id": comment.id.to_string(),
+                        "preview": comment.body.chars().take(120).collect::<String>(),
+                    }),
+                },
+            )
+            .await;
+        }
+    }
     tracing::info!(comment_id = %comment.id, post_id = %post_id, "comment created");
     Ok((
         StatusCode::CREATED,
@@ -680,6 +702,28 @@ pub async fn set_reaction(
         .set(post_id, auth_user.user_id, &req.kind)
         .await
         .map_err(map_repo_error)?;
+    // Activity feed: notify the post author (not for self-reactions).
+    let posts = Posts::new(state.pool.clone());
+    if let Ok(Some(post)) = posts.get_by_id(post_id).await {
+        if post.author_id != auth_user.user_id {
+            crate::realtime::notify(
+                &state.pool,
+                &state.realtime,
+                crate::realtime::Notify {
+                    user_id: post.author_id,
+                    kind: "reaction",
+                    actor_id: Some(auth_user.user_id),
+                    entity_type: "post",
+                    entity_id: Some(post_id),
+                    payload: serde_json::json!({
+                        "post_id": post_id.to_string(),
+                        "kind": reaction.kind,
+                    }),
+                },
+            )
+            .await;
+        }
+    }
     tracing::info!(post_id = %post_id, kind = %reaction.kind, "reaction set");
     Ok(Json(json!({
         "reaction": {

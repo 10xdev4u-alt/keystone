@@ -8,6 +8,7 @@
 pub mod assessments;
 pub mod bookmarks;
 pub mod careers;
+pub mod chat;
 pub mod comments;
 pub mod communities;
 pub mod community_posts;
@@ -17,6 +18,7 @@ pub mod learning;
 pub mod links;
 pub mod mentorship;
 pub mod moderation;
+pub mod notifications;
 pub mod organizations;
 pub mod polls;
 pub mod posts;

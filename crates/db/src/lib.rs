@@ -3,6 +3,8 @@
 //! via `query!` once offline metadata is wired); dynamic SQL is banned.
 #![forbid(unsafe_code)]
 
+pub mod event_bus;
+
 pub use sqlx;
 
 use sqlx::postgres::PgPoolOptions;
