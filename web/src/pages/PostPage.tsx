@@ -1,6 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useComments, useCreateComment, useCurrentUser, usePost } from "../api/hooks";
+import {
+  useComments,
+  useCreateComment,
+  useCurrentUser,
+  usePost,
+  useRelatedPosts,
+} from "../api/hooks";
 import { EmptyState, ErrorState, Skeleton, Spinner } from "../components/Status/Status";
 import "./post.css";
 
@@ -16,6 +22,62 @@ function timeAgo(iso: string): string {
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d ago`;
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+/** Sticky reading-progress bar — fills as the reader scrolls the article. */
+function ReadingProgress() {
+  const [progress, setProgress] = useState(0);
+  useEffect(() => {
+    function onScroll() {
+      const doc = document.documentElement;
+      const total = doc.scrollHeight - doc.clientHeight;
+      setProgress(total > 0 ? Math.min(100, Math.round((window.scrollY / total) * 100)) : 0);
+    }
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, []);
+  return (
+    <div className="reading-progress" role="progressbar" aria-label="Reading progress" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+      <div className="reading-progress__bar" style={{ width: `${progress}%` }} />
+    </div>
+  );
+}
+
+/** Share actions — native share sheet where available, else copy link. */
+function ShareActions({ title, url }: { title: string; url: string }) {
+  const [copied, setCopied] = useState(false);
+  const canShare = typeof navigator !== "undefined" && !!navigator.share;
+
+  async function share() {
+    if (canShare) {
+      try {
+        await navigator.share({ title, url });
+        return;
+      } catch {
+        // user dismissed or share unsupported → fall through to copy
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+
+  return (
+    <div className="share">
+      <button type="button" className="share__btn" onClick={() => void share()}>
+        {copied ? "✓ Copied" : canShare ? "Share" : "Copy link"}
+      </button>
+    </div>
+  );
 }
 
 function PostSkeleton() {
@@ -46,6 +108,11 @@ export function PostPage() {
     isError: commentsError,
     refetch: refetchComments,
   } = useComments(id);
+
+  const {
+    data: related,
+    isLoading: relatedLoading,
+  } = useRelatedPosts(id);
 
   const { data: me, isLoading: meLoading } = useCurrentUser();
   const [comment, setComment] = useState("");
@@ -78,6 +145,7 @@ export function PostPage() {
         />
       ) : (
         <>
+          <ReadingProgress />
           <article className="post">
             <div className="post__top">
               <span className="post__kind" data-kind={post.kind}>
@@ -90,6 +158,7 @@ export function PostPage() {
               {post.published_at && <time dateTime={post.published_at}>{timeAgo(post.published_at)}</time>}
               <span>{post.view_count} views</span>
               <span>by {post.author_id.slice(0, 8)}</span>
+              <ShareActions title={post.title} url={window.location.href} />
             </div>
             <div className="post__body">{post.body}</div>
           </article>
@@ -163,8 +232,44 @@ export function PostPage() {
               </div>
             )}
           </section>
+
+          <RelatedSection loading={relatedLoading} posts={related?.posts ?? []} />
         </>
       )}
     </div>
+  );
+}
+
+function RelatedSection({
+  loading,
+  posts,
+}: {
+  loading: boolean;
+  posts: { id: string; kind: string; title: string; slug: string; summary?: string | null }[];
+}) {
+  if (posts.length === 0) return null;
+  return (
+    <section className="related" aria-labelledby="related-heading">
+      <h2 id="related-heading" className="related__heading">
+        Related reading
+      </h2>
+      {loading ? (
+        <Skeleton className="related__skeleton" />
+      ) : (
+        <ul className="related__list">
+          {posts.map((p) => (
+            <li key={p.id} className="related__item">
+              <Link to={`/posts/${p.slug}`} className="related__link">
+                <span className="related__kind" data-kind={p.kind}>
+                  {p.kind}
+                </span>
+                <h3 className="related__title">{p.title}</h3>
+                {p.summary && <p className="related__summary">{p.summary}</p>}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

@@ -394,6 +394,57 @@ pub async fn get_post(
     Ok(Json(json!({ "post": post_view(&post) })))
 }
 
+/// A related-reading card: same tag family, ranked by overlap then recency.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct RelatedPostView {
+    pub id: String,
+    pub kind: String,
+    pub title: String,
+    pub slug: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub published_at: Option<String>,
+}
+
+/// Wrapper for the related-posts endpoint.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct RelatedPosts {
+    pub posts: Vec<RelatedPostView>,
+}
+
+/// Related reading for a post — posts sharing tags, ranked by overlap.
+#[utoipa::path(
+    get,
+    path = "/api/v1/posts/{id}/related",
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 200, description = "Related posts", body = RelatedPosts),
+        (status = 404, description = "Post not found"),
+    ),
+    tag = "content"
+)]
+pub async fn get_related(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<RelatedPosts>> {
+    let posts = Posts::new(state.pool.clone());
+    let rows = posts.related(id, 6).await.map_err(map_repo_error)?;
+    Ok(Json(RelatedPosts {
+        posts: rows
+            .into_iter()
+            .map(|p| RelatedPostView {
+                id: p.id.to_string(),
+                kind: p.kind,
+                title: p.title.unwrap_or_default(),
+                slug: p.slug,
+                summary: p.summary,
+                published_at: p.published_at.map(|t| t.to_rfc3339()),
+            })
+            .collect(),
+    }))
+}
+
 /// Full post — the reader view contract.
 #[derive(Debug, serde::Serialize, ToSchema)]
 pub struct PostView {

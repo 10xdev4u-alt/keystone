@@ -224,3 +224,106 @@
   color: var(--color-accent, #6366f1);
   font-weight: 600;
 }
+
+/* ── Editorial: reading progress ─────────────────────────────────────────── */
+.reading-progress {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: 3px;
+  background: transparent;
+}
+
+.reading-progress__bar {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #7b87f4);
+  transition: width 80ms linear;
+}
+
+/* ── Editorial: share actions ────────────────────────────────────────────── */
+.share {
+  display: inline-flex;
+}
+
+.share__btn {
+  background: transparent;
+  border: 1px solid var(--color-border, rgba(148, 163, 184, 0.3));
+  color: var(--color-text-muted, #94a3b8);
+  border-radius: 999px;
+  padding: 0.15rem 0.7rem;
+  font: var(--type-body-sm);
+  cursor: pointer;
+  transition: border-color 120ms, color 120ms;
+}
+
+.share__btn:hover {
+  border-color: var(--color-accent, #6366f1);
+  color: var(--color-text, #e2e8f0);
+}
+
+/* ── Editorial: related reading ──────────────────────────────────────────── */
+.related {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border, rgba(148, 163, 184, 0.2));
+}
+
+.related__heading {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+
+.related__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.related__link {
+  display: block;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--color-border, rgba(148, 163, 184, 0.2));
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 120ms, transform 120ms;
+}
+
+.related__link:hover {
+  border-color: var(--color-accent, #6366f1);
+  transform: translateY(-1px);
+}
+
+.related__kind {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-accent, #6366f1);
+  margin-bottom: 0.25rem;
+}
+
+.related__title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+}
+
+.related__summary {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #94a3b8);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.related__skeleton {
+  height: 4rem;
+  border-radius: 10px;
+}

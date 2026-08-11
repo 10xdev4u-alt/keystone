@@ -1849,6 +1849,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/posts/{id}/related": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Related reading for a post — posts sharing tags, ranked by overlap. */
+        get: operations["get_related"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/posts/{id}/versions": {
         parameters: {
             query?: never;
@@ -2574,6 +2591,19 @@ export interface components {
             size_bytes: number;
             /** Format: int32 */
             width?: number | null;
+        };
+        /** @description A related-reading card: same tag family, ranked by overlap then recency. */
+        RelatedPostView: {
+            id: string;
+            kind: string;
+            published_at?: string | null;
+            slug: string;
+            summary?: string | null;
+            title: string;
+        };
+        /** @description Wrapper for the related-posts endpoint. */
+        RelatedPosts: {
+            posts: components["schemas"]["RelatedPostView"][];
         };
         ReportQueueQuery: {
             /** Format: int64 */
@@ -6861,6 +6891,36 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+        };
+    };
+    get_related: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Post id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Related posts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedPosts"];
+                };
+            };
+            /** @description Post not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

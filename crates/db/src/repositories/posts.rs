@@ -240,6 +240,41 @@ impl Posts {
 
     /// Lock a discussion: new comments are refused by callers while
     /// `locked_at` is set. Answers whether a live post was locked.
+    /// Find published, public posts (excluding `id`) that share at least one
+    /// tag, ranked by shared-tag count then recency. Used for the editorial
+    /// "related reading" rail.
+    pub async fn related(&self, id: Uuid, limit: i64) -> Result<Vec<Post>, RepoError> {
+        let rows = sqlx::query_as::<_, Post>(
+            r#"
+            SELECT DISTINCT ON (p.id)
+                   p.id, p.author_id, p.kind, p.title, p.slug, p.body, p.summary,
+                   p.status, p.visibility, p.view_count, p.published_at,
+                   p.created_at, p.updated_at
+            FROM posts p
+            JOIN post_tags pt ON pt.post_id = p.id
+            WHERE p.id <> $1
+              AND p.status = 'published'
+              AND p.visibility = 'public'
+              AND p.deleted_at IS NULL
+              AND pt.tag_id IN (
+                  SELECT tag_id FROM post_tags WHERE post_id = $1
+              )
+            ORDER BY p.id, (
+                SELECT count(*) FROM post_tags pt2
+                WHERE pt2.post_id = p.id
+                  AND pt2.tag_id IN (SELECT tag_id FROM post_tags WHERE post_id = $1)
+            ) DESC, p.created_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(RepoError::from)?;
+        Ok(rows)
+    }
+
     pub async fn lock(&self, id: Uuid) -> Result<bool, RepoError> {
         let result =
             sqlx::query("UPDATE posts SET locked_at = now() WHERE id = $1 AND deleted_at IS NULL")

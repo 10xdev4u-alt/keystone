@@ -112,6 +112,7 @@ pub fn router(state: AppState) -> Router {
                 .patch(content::update_post)
                 .delete(content::delete_post),
         )
+        .route("/api/v1/posts/{id}/related", get(content::get_related))
         .route("/api/v1/posts/{id}/versions", get(content::post_versions))
         .route("/api/v1/posts/{id}/view", post(content::record_view))
         .route(

@@ -4931,6 +4931,42 @@
         }
       }
     },
+    "/api/v1/posts/{id}/related": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Related reading for a post — posts sharing tags, ranked by overlap.",
+        "operationId": "get_related",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Post id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Related posts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelatedPosts"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Post not found"
+          }
+        }
+      }
+    },
     "/api/v1/posts/{id}/versions": {
       "get": {
         "tags": [
@@ -7181,6 +7217,57 @@
               "null"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "RelatedPostView": {
+        "type": "object",
+        "description": "A related-reading card: same tag family, ranked by overlap then recency.",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "slug"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "RelatedPosts": {
+        "type": "object",
+        "description": "Wrapper for the related-posts endpoint.",
+        "required": [
+          "posts"
+        ],
+        "properties": {
+          "posts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelatedPostView"
+            }
           }
         }
       },

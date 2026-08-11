@@ -22,6 +22,7 @@ type PostListPage = components["schemas"]["PostListPage"];
 type PostDetailResponse = components["schemas"]["PostDetailResponse"];
 type CommentList = components["schemas"]["CommentList"];
 type CommentResponse = components["schemas"]["CommentResponse"];
+type RelatedPosts = components["schemas"]["RelatedPosts"];
 type CreateCommentRequest = components["schemas"]["CreateCommentRequest"];
 type CommunityList = components["schemas"]["CommunityList"];
 type CommunityDetailResponse = components["schemas"]["CommunityDetailResponse"];
@@ -249,6 +250,26 @@ export function useCreateComment(
       qc.invalidateQueries({ queryKey: ["comments", postId] });
       userOnSuccess?.(data, vars, ctx, mutation);
     },
+  });
+}
+
+export function useRelatedPosts(
+  postId: string,
+  options?: QueryOptions<RelatedPosts>,
+) {
+  return useQuery({
+    queryKey: ["posts", postId, "related"],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/posts/{id}/related", {
+        params: { path: { id: postId } },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty related response");
+      return data;
+    },
+    enabled: Boolean(postId),
+    staleTime: 5 * 60_000,
+    ...options,
   });
 }
 
