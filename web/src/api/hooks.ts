@@ -19,6 +19,10 @@ type UserView = components["schemas"]["UserView"];
 type RegisterRequest = components["schemas"]["SignupRequest"];
 type LoginRequest = components["schemas"]["LoginRequest"];
 type PostListPage = components["schemas"]["PostListPage"];
+type PostDetailResponse = components["schemas"]["PostDetailResponse"];
+type CommentList = components["schemas"]["CommentList"];
+type CommentResponse = components["schemas"]["CommentResponse"];
+type CreateCommentRequest = components["schemas"]["CreateCommentRequest"];
 
 // ── Content ──────────────────────────────────────────────────────────────────
 
@@ -136,9 +140,10 @@ export function useLogout(options?: UseMutationOptions<void, ApiRequestError, vo
   });
 }
 
+/** Full post reader view — slug or UUID. */
 export function usePost(
   id: string,
-  options?: UseQueryOptions<unknown, ApiRequestError>,
+  options?: UseQueryOptions<PostDetailResponse, ApiRequestError>,
 ) {
   return useQuery({
     queryKey: ["posts", id],
@@ -147,10 +152,56 @@ export function usePost(
         params: { path: { id } },
       });
       if (error) throw error;
+      if (!data) throw new Error("Empty post response");
       return data;
     },
     enabled: Boolean(id),
+    staleTime: 30_000,
     ...options,
+  });
+}
+
+/** Comment thread for a post. */
+export function useComments(
+  postId: string,
+  options?: UseQueryOptions<CommentList, ApiRequestError>,
+) {
+  return useQuery({
+    queryKey: ["comments", postId],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/posts/{id}/comments", {
+        params: { path: { id: postId } },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty comments response");
+      return data;
+    },
+    enabled: Boolean(postId),
+    ...options,
+  });
+}
+
+export function useCreateComment(
+  postId: string,
+  options?: UseMutationOptions<CommentResponse, ApiRequestError, CreateCommentRequest>,
+) {
+  const qc = useQueryClient();
+  const { onSuccess: userOnSuccess, ...rest } = options ?? {};
+  return useMutation({
+    ...rest,
+    mutationFn: async (req) => {
+      const { data, error } = await client.POST("/api/v1/posts/{id}/comments", {
+        params: { path: { id: postId } },
+        body: req,
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty comment response");
+      return data;
+    },
+    onSuccess: (data, vars, ctx, mutation) => {
+      qc.invalidateQueries({ queryKey: ["comments", postId] });
+      userOnSuccess?.(data, vars, ctx, mutation);
+    },
   });
 }
 
