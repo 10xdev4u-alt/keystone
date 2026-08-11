@@ -1,0 +1,229 @@
+/* ==========================================================================
+   Keystone Design Tokens
+   Single source of truth for color, spacing, typography, radii, elevation,
+   and motion. Every component stylesheet references these variables only —
+   never hard-coded values.
+
+   Theme switching: the default theme follows `prefers-color-scheme`; an
+   explicit `data-theme="light" | "dark"` attribute on <html> wins (used by
+   the settings toggle). Both must meet WCAG AA contrast for body text.
+   ========================================================================== */
+
+:root {
+  /* ── Color · light (default) ────────────────────────────────────────── */
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+
+  --color-text: #0f172a;
+  --color-text-muted: #475569;
+  --color-text-faint: #94a3b8;
+
+  --color-primary: #4338ca;        /* indigo-700 — AA on white */
+  --color-primary-hover: #3730a3;
+  --color-primary-active: #312e81;
+  --color-primary-soft: #e0e7ff;
+  --color-on-primary: #ffffff;
+
+  --color-danger: #b91c1c;         /* red-700 — AA on white */
+  --color-danger-hover: #991b1b;
+  --color-danger-soft: #fee2e2;
+  --color-on-danger: #ffffff;
+
+  --color-success: #15803d;        /* green-700 */
+  --color-success-soft: #dcfce7;
+  --color-warning: #b45309;        /* amber-700 */
+  --color-warning-soft: #fef3c7;
+  --color-info-soft: #dbeafe;
+
+  --color-link: #1d4ed8;
+
+  /* ── Focus ring ─────────────────────────────────────────────────────── */
+  --focus-ring: 0 0 0 3px rgb(67 56 202 / 0.35);
+
+  /* ── Spacing scale (4px base) ───────────────────────────────────────── */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --space-9: 6rem;
+  --space-10: 8rem;
+
+  /* ── Typography ─────────────────────────────────────────────────────── */
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", Menlo,
+    Consolas, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.75;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* ── Radii ──────────────────────────────────────────────────────────── */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-full: 9999px;
+
+  /* ── Elevation ──────────────────────────────────────────────────────── */
+  --shadow-1: 0 1px 2px rgb(15 23 42 / 0.06);
+  --shadow-2: 0 4px 12px rgb(15 23 42 / 0.08);
+  --shadow-3: 0 12px 32px rgb(15 23 42 / 0.12);
+
+  /* ── Motion ─────────────────────────────────────────────────────────── */
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0.2, 1);
+
+  /* ── Layout ─────────────────────────────────────────────────────────── */
+  --container-max: 72rem;
+  --header-height: 4rem;
+
+  /* ── Component sizes ────────────────────────────────────────────────── */
+  --control-height-sm: 2rem;
+  --control-height-md: 2.5rem;
+  --control-height-lg: 3rem;
+}
+
+/* Dark theme — follows system unless [data-theme="dark"] is set. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #0b1120;
+    --color-surface: #111827;
+    --color-surface-raised: #1f2937;
+    --color-surface-muted: #1e293b;
+    --color-border: #334155;
+    --color-border-strong: #475569;
+
+    --color-text: #f8fafc;
+    --color-text-muted: #cbd5e1;
+    --color-text-faint: #64748b;
+
+    --color-primary: #818cf8;        /* indigo-400 — AA on dark */
+    --color-primary-hover: #a5b4fc;
+    --color-primary-active: #6366f1;
+    --color-primary-soft: #312e81;
+    --color-on-primary: #0f172a;
+
+    --color-danger: #f87171;
+    --color-danger-hover: #fca5a5;
+    --color-danger-soft: #450a0a;
+    --color-on-danger: #0f172a;
+
+    --color-success: #4ade80;
+    --color-success-soft: #14532d;
+    --color-warning: #fbbf24;
+    --color-warning-soft: #451a03;
+    --color-info-soft: #1e3a8a;
+
+    --color-link: #93c5fd;
+
+    --focus-ring: 0 0 0 3px rgb(129 140 248 / 0.4);
+
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-2: 0 4px 12px rgb(0 0 0 / 0.5);
+    --shadow-3: 0 12px 32px rgb(0 0 0 / 0.6);
+  }
+}
+
+/* Explicit dark — overrides the system preference. */
+[data-theme="dark"] {
+  --color-bg: #0b1120;
+  --color-surface: #111827;
+  --color-surface-raised: #1f2937;
+  --color-surface-muted: #1e293b;
+  --color-border: #334155;
+  --color-border-strong: #475569;
+
+  --color-text: #f8fafc;
+  --color-text-muted: #cbd5e1;
+  --color-text-faint: #64748b;
+
+  --color-primary: #818cf8;
+  --color-primary-hover: #a5b4fc;
+  --color-primary-active: #6366f1;
+  --color-primary-soft: #312e81;
+  --color-on-primary: #0f172a;
+
+  --color-danger: #f87171;
+  --color-danger-hover: #fca5a5;
+  --color-danger-soft: #450a0a;
+  --color-on-danger: #0f172a;
+
+  --color-success: #4ade80;
+  --color-success-soft: #14532d;
+  --color-warning: #fbbf24;
+  --color-warning-soft: #451a03;
+  --color-info-soft: #1e3a8a;
+
+  --color-link: #93c5fd;
+
+  --focus-ring: 0 0 0 3px rgb(129 140 248 / 0.4);
+
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-2: 0 4px 12px rgb(0 0 0 / 0.5);
+  --shadow-3: 0 12px 32px rgb(0 0 0 / 0.6);
+}
+
+/* Explicit light — overrides the system preference. */
+[data-theme="light"] {
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+
+  --color-text: #0f172a;
+  --color-text-muted: #475569;
+  --color-text-faint: #94a3b8;
+
+  --color-primary: #4338ca;
+  --color-primary-hover: #3730a3;
+  --color-primary-active: #312e81;
+  --color-primary-soft: #e0e7ff;
+  --color-on-primary: #ffffff;
+
+  --color-danger: #b91c1c;
+  --color-danger-hover: #991b1b;
+  --color-danger-soft: #fee2e2;
+  --color-on-danger: #ffffff;
+
+  --color-success: #15803d;
+  --color-success-soft: #dcfce7;
+  --color-warning: #b45309;
+  --color-warning-soft: #fef3c7;
+  --color-info-soft: #dbeafe;
+
+  --color-link: #1d4ed8;
+
+  --focus-ring: 0 0 0 3px rgb(67 56 202 / 0.35);
+
+  --shadow-1: 0 1px 2px rgb(15 23 42 / 0.06);
+  --shadow-2: 0 4px 12px rgb(15 23 42 / 0.08);
+  --shadow-3: 0 12px 32px rgb(15 23 42 / 0.12);
+}

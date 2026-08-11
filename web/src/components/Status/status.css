@@ -1,0 +1,103 @@
+.skeleton {
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-muted) 25%,
+    var(--color-border) 50%,
+    var(--color-surface-muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-5);
+  text-align: center;
+}
+
+.status__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-full);
+  color: var(--color-text-faint);
+}
+
+.status--empty .status__icon {
+  background: var(--color-surface-muted);
+}
+
+.status--error .status__icon {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.status__title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+}
+
+.status__description {
+  max-width: 28rem;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.status__action {
+  margin-top: var(--space-2);
+}
+
+.status__retry {
+  height: var(--control-height-md);
+  padding-inline: var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.status__retry:hover {
+  background: var(--color-surface-muted);
+  border-color: var(--color-text-faint);
+}
+
+.spinner {
+  display: inline-flex;
+  align-items: center;
+}
+
+.spinner__ring {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid var(--color-border-strong);
+  border-top-color: var(--color-primary);
+  border-radius: var(--radius-full);
+  animation: btn-spin 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+  .spinner__ring {
+    animation-duration: 2s;
+  }
+}

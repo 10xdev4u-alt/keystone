@@ -68,6 +68,31 @@ jobs:
         # non-zero on any un-ignored vulnerability.
         run: cargo audit
 
+  web-quality:
+    name: Web lint · typecheck · test · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit + a11y tests
+        run: npm run test
+      - name: Production build
+        run: npm run build
+
   security-grep:
     name: Secrets-in-logs guard
     runs-on: ubuntu-latest
