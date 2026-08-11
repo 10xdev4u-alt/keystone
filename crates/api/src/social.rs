@@ -321,6 +321,7 @@ pub async fn leave_community(
 #[utoipa::path(
     get,
     path = "/api/v1/communities/{slug}/members",
+    operation_id = "community_list_members",
     params(("slug" = String, Path, description = "Community slug")),
     responses(
         (status = 200, description = "Members", body = Value),
@@ -359,6 +360,7 @@ pub async fn list_members(
 #[utoipa::path(
     patch,
     path = "/api/v1/communities/{slug}/members/{member_id}",
+    operation_id = "community_set_member_role",
     request_body = SetMemberRoleRequest,
     params(
         ("slug" = String, Path, description = "Community slug"),

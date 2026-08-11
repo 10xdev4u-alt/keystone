@@ -248,6 +248,7 @@ pub async fn leave_org(
 #[utoipa::path(
     get,
     path = "/api/v1/orgs/{slug}/members",
+    operation_id = "org_list_members",
     params(("slug" = String, Path, description = "Organization slug")),
     responses(
         (status = 200, description = "Members", body = Value),
@@ -285,6 +286,7 @@ pub async fn list_members(
 #[utoipa::path(
     patch,
     path = "/api/v1/orgs/{slug}/members/{member_id}",
+    operation_id = "org_set_member_role",
     request_body = SetRoleRequest,
     params(
         ("slug" = String, Path, description = "Organization slug"),

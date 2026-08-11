@@ -210,5 +210,36 @@ export function useEvents(
 }
 
 // ── Network ─────────────────────────────────────────────────────────────────
-// Org/profile hooks land with the regenerated client once #62 (network+careers
-// annotations) merges.
+
+export function useOrgs(
+  query: operations["list_orgs"]["parameters"]["query"] = {},
+  options?: UseQueryOptions<unknown, ApiRequestError>,
+) {
+  return useQuery({
+    queryKey: ["orgs", query],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/orgs", { params: { query } });
+      if (error) throw error;
+      return data;
+    },
+    ...options,
+  });
+}
+
+export function useProfile(
+  userId: string,
+  options?: UseQueryOptions<unknown, ApiRequestError>,
+) {
+  return useQuery({
+    queryKey: ["profiles", userId],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/users/{user_id}/profile", {
+        params: { path: { user_id: userId } },
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: Boolean(userId),
+    ...options,
+  });
+}

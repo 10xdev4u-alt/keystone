@@ -175,9 +175,6 @@ fn spec_tags_each_operation() {
         }
     }
     assert!(
-
-        tagged >= 75,
-        "expected >= 75 tagged operations, got {tagged}"
         tagged >= 105,
         "expected >= 105 tagged operations, got {tagged}"
     );

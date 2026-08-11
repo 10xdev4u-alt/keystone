@@ -515,6 +515,141 @@
         ]
       }
     },
+    "/api/v1/career-paths": {
+      "get": {
+        "tags": [
+          "careers"
+        ],
+        "summary": "List all career paths.",
+        "operationId": "list_career_paths",
+        "responses": {
+          "200": {
+            "description": "Career paths",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "careers"
+        ],
+        "summary": "Create a career path.",
+        "operationId": "create_career_path",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CareerPathRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Career path created",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/career-paths/{path_id}": {
+      "get": {
+        "tags": [
+          "careers"
+        ],
+        "summary": "Fetch a career path with its steps.",
+        "operationId": "get_career_path",
+        "parameters": [
+          {
+            "name": "path_id",
+            "in": "path",
+            "description": "Career path id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Career path + steps",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Career path not found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "careers"
+        ],
+        "summary": "Add a step to a career path.",
+        "operationId": "add_step",
+        "parameters": [
+          {
+            "name": "path_id",
+            "in": "path",
+            "description": "Career path id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StepRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Step added",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/api/v1/comments/{id}": {
       "delete": {
         "tags": [
@@ -739,7 +874,7 @@
           "social"
         ],
         "summary": "List a community's members.",
-        "operationId": "list_members",
+        "operationId": "community_list_members",
         "parameters": [
           {
             "name": "slug",
@@ -772,7 +907,7 @@
           "social"
         ],
         "summary": "Change a member's role. Community staff only.",
-        "operationId": "set_member_role",
+        "operationId": "community_set_member_role",
         "parameters": [
           {
             "name": "slug",
@@ -2181,6 +2316,68 @@
         ]
       }
     },
+    "/api/v1/me/assessments": {
+      "get": {
+        "tags": [
+          "careers"
+        ],
+        "summary": "The caller's self-assessments.",
+        "operationId": "my_assessments",
+        "responses": {
+          "200": {
+            "description": "Assessments",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "careers"
+        ],
+        "summary": "Submit a self-assessment against a career step.",
+        "operationId": "add_assessment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssessmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Assessment recorded",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/api/v1/me/bookmarks": {
       "get": {
         "tags": [
@@ -2218,6 +2415,33 @@
         "responses": {
           "200": {
             "description": "Certificates",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/connections": {
+      "get": {
+        "tags": [
+          "network"
+        ],
+        "summary": "The caller's accepted connections.",
+        "operationId": "my_connections",
+        "responses": {
+          "200": {
+            "description": "Connections list",
             "content": {
               "application/json": {
                 "schema": {}
@@ -2326,6 +2550,175 @@
         ]
       }
     },
+    "/api/v1/me/education": {
+      "post": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Add an education entry to the caller's profile.",
+        "operationId": "add_education",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EducationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Entry added",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/education/{id}": {
+      "delete": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Remove an education entry. Owner only.",
+        "operationId": "remove_education",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Entry id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Entry removed"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/experience": {
+      "post": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Add a work experience entry to the caller's profile.",
+        "operationId": "add_experience",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExperienceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Entry added",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/experience/{id}": {
+      "delete": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Remove a work experience entry. Owner only.",
+        "operationId": "remove_experience",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Entry id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Entry removed"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/following": {
+      "get": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Users the caller follows.",
+        "operationId": "my_following",
+        "responses": {
+          "200": {
+            "description": "Following list",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/api/v1/me/mentor-profile": {
       "put": {
         "tags": [
@@ -2351,6 +2744,108 @@
                 "schema": {}
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/profile": {
+      "put": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Update the caller's own profile.",
+        "operationId": "set_profile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated profile",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/skills": {
+      "put": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Add a skill to the caller's profile.",
+        "operationId": "add_skill",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Skill added"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/skills/{skill}": {
+      "delete": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Remove a skill. Owner only.",
+        "operationId": "remove_skill",
+        "parameters": [
+          {
+            "name": "skill",
+            "in": "path",
+            "description": "Skill name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Skill removed"
           },
           "401": {
             "description": "Missing or invalid access token"
@@ -2760,6 +3255,675 @@
           },
           "401": {
             "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/orgs": {
+      "get": {
+        "tags": [
+          "network"
+        ],
+        "summary": "List organizations (paged).",
+        "operationId": "list_orgs",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Page offset",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Organizations page",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Create an organization. The creator becomes the owner.",
+        "operationId": "create_org",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrgRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Organization created",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/orgs/{slug}": {
+      "get": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Fetch an organization by slug.",
+        "operationId": "get_org",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Organization",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Organization not found"
+          }
+        }
+      }
+    },
+    "/api/v1/orgs/{slug}/alerts": {
+      "get": {
+        "tags": [
+          "careers"
+        ],
+        "summary": "List an organization's compliance alerts.",
+        "operationId": "list_alerts",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alerts",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "careers"
+        ],
+        "summary": "Create a compliance alert for an organization. Org admin/owner only.",
+        "operationId": "add_alert",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Alert created",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          },
+          "403": {
+            "description": "Not an org admin"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/orgs/{slug}/alerts/{alert_id}/resolve": {
+      "post": {
+        "tags": [
+          "careers"
+        ],
+        "summary": "Resolve a compliance alert. Org admin/owner only.",
+        "operationId": "resolve_alert",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "alert_id",
+            "in": "path",
+            "description": "Alert id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Alert resolved"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          },
+          "403": {
+            "description": "Not an org admin"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/orgs/{slug}/claims": {
+      "post": {
+        "tags": [
+          "network"
+        ],
+        "summary": "File an org claim. The claimant must already be a member (prevents\ndrive-by domain takeover attempts on orgs you have no stake in). Only\nthe token HASH is persisted.\nFile a domain claim on an organization. Requires a matching DNS TXT\nrecord (verification step below).",
+        "operationId": "file_claim",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Claim filed",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/orgs/{slug}/claims/{claim_id}/verify": {
+      "post": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Verify a claim with the token. The token is hashed before comparison.\nVerify a domain claim (checks the DNS TXT record).",
+        "operationId": "verify_claim",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "claim_id",
+            "in": "path",
+            "description": "Claim id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyClaimRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Verification result",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/orgs/{slug}/join": {
+      "post": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Join an organization.",
+        "operationId": "join_org",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Joined"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          },
+          "404": {
+            "description": "Organization not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/orgs/{slug}/leave": {
+      "delete": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Leave an organization.",
+        "operationId": "leave_org",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Left"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/orgs/{slug}/members": {
+      "get": {
+        "tags": [
+          "network"
+        ],
+        "summary": "List an organization's members.",
+        "operationId": "org_list_members",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Members",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Organization not found"
+          }
+        }
+      }
+    },
+    "/api/v1/orgs/{slug}/members/{member_id}": {
+      "patch": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Role changes require the org owner. Ownership transfer demotes the old\nowner atomically (repo-level invariant).\nChange an organization member's role. Org staff only.",
+        "operationId": "org_set_member_role",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "description": "Member user id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Role updated"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          },
+          "403": {
+            "description": "Insufficient role"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/orgs/{slug}/vendors": {
+      "get": {
+        "tags": [
+          "careers"
+        ],
+        "summary": "List an organization's verified vendor listings.",
+        "operationId": "list_vendors",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vendors",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "careers"
+        ],
+        "summary": "Manage (create) vendor listings — org admins/owners only.\nAdd a vendor listing to an organization. Org admin/owner only.",
+        "operationId": "add_vendor",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Vendor added",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          },
+          "403": {
+            "description": "Not an org admin"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/orgs/{slug}/vendors/{listing_id}": {
+      "delete": {
+        "tags": [
+          "careers"
+        ],
+        "summary": "Remove a vendor listing. Org admin/owner only.",
+        "operationId": "remove_vendor",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "listing_id",
+            "in": "path",
+            "description": "Vendor listing id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Vendor removed"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          },
+          "403": {
+            "description": "Not an org admin"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/orgs/{slug}/vendors/{listing_id}/verify": {
+      "post": {
+        "tags": [
+          "careers"
+        ],
+        "summary": "Verify a vendor listing. Org admin/owner only.",
+        "operationId": "verify_vendor",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "listing_id",
+            "in": "path",
+            "description": "Vendor listing id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Vendor verified"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          },
+          "403": {
+            "description": "Not an org admin"
           }
         },
         "security": [
@@ -3854,6 +5018,73 @@
         ]
       }
     },
+    "/api/v1/salaries": {
+      "post": {
+        "tags": [
+          "careers"
+        ],
+        "summary": "Submit one anonymized salary data point. Nothing user-identifying is\nwritten — the bucket row only ever carries bounds + count. Sub-threshold\nbuckets stay unreadable, so even the writer cannot deanonymize.\nSubmit an anonymized salary data point.",
+        "operationId": "submit_salary",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalarySubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Submission merged into aggregate",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/salaries/search": {
+      "get": {
+        "tags": [
+          "careers"
+        ],
+        "summary": "Readable buckets for a role — sub-threshold buckets are absent by design.\nAggregated salary ranges for a role (anonymized, bucketed).",
+        "operationId": "salaries_for_role",
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "description": "Role title",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Salary aggregates",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sessions/{session_id}/feedback": {
       "post": {
         "tags": [
@@ -3955,6 +5186,306 @@
         ]
       }
     },
+    "/api/v1/users/{user_id}/block": {
+      "put": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Block a user. Blocks hide profiles and mute interactions both ways.",
+        "operationId": "block",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "Target user id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Blocked"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Unblock a user.",
+        "operationId": "unblock",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "Target user id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Unblocked"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}/connect": {
+      "put": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Send a connection request.",
+        "operationId": "connect",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "Target user id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Request sent"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Cancel a pending connection request.",
+        "operationId": "cancel_connect",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "Target user id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Request cancelled"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}/connections/accept": {
+      "post": {
+        "tags": [
+          "network"
+        ],
+        "summary": "The TARGET accepts the requester's pending connection.\nAccept a connection request.",
+        "operationId": "accept_connection",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "Requester user id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Connected"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}/connections/reject": {
+      "post": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Reject a connection request.",
+        "operationId": "reject_connection",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "Requester user id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Request rejected"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}/follow": {
+      "put": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Follow a user.",
+        "operationId": "follow",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "Target user id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Following"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Unfollow a user.",
+        "operationId": "unfollow",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "Target user id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Unfollowed"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}/profile": {
+      "get": {
+        "tags": [
+          "network"
+        ],
+        "summary": "Fetch a profile. Visibility matrix: public → everyone, connections only,\nprivate → self; blocks hide the profile entirely (404).",
+        "operationId": "get_profile",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "User id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Profile not found or hidden"
+          }
+        }
+      }
+    },
     "/api/v1/ws/chat/{id}": {
       "get": {
         "tags": [
@@ -4016,6 +5547,25 @@
           }
         }
       },
+      "AlertRequest": {
+        "type": "object",
+        "required": [
+          "kind",
+          "severity",
+          "message"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          }
+        }
+      },
       "AnswerRequest": {
         "type": "object",
         "required": [
@@ -4064,6 +5614,34 @@
           "answer_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "CareerPathRequest": {
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "ClaimRequest": {
+        "type": "object",
+        "required": [
+          "domain"
+        ],
+        "properties": {
+          "domain": {
+            "type": "string"
           }
         }
       },
@@ -4226,6 +5804,35 @@
           }
         }
       },
+      "CreateOrgRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "industry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "website": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "CreatePostRequest": {
         "type": "object",
         "required": [
@@ -4299,6 +5906,93 @@
             "format": "int32"
           },
           "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "EducationRequest": {
+        "type": "object",
+        "required": [
+          "school",
+          "start_year"
+        ],
+        "properties": {
+          "degree": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_year": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "school": {
+            "type": "string"
+          },
+          "start_year": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ExperienceRequest": {
+        "type": "object",
+        "required": [
+          "title",
+          "start_date",
+          "current"
+        ],
+        "properties": {
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "organization_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "title": {
             "type": "string"
           }
         }
@@ -4693,6 +6387,43 @@
           }
         }
       },
+      "SalaryQuery": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "SalarySubmitRequest": {
+        "type": "object",
+        "required": [
+          "role",
+          "currency",
+          "amount"
+        ],
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
       "SendMessageRequest": {
         "type": "object",
         "required": [
@@ -4732,6 +6463,29 @@
           }
         }
       },
+      "SetProfileRequest": {
+        "type": "object",
+        "properties": {
+          "bio": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "visibility": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "SetReactionRequest": {
         "type": "object",
         "required": [
@@ -4739,6 +6493,54 @@
         ],
         "properties": {
           "kind": {
+            "type": "string"
+          }
+        }
+      },
+      "SetRoleRequest": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "SkillRequest": {
+        "type": "object",
+        "required": [
+          "skill",
+          "level"
+        ],
+        "properties": {
+          "level": {
+            "type": "string"
+          },
+          "skill": {
+            "type": "string"
+          }
+        }
+      },
+      "StepRequest": {
+        "type": "object",
+        "required": [
+          "position",
+          "title"
+        ],
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
             "type": "string"
           }
         }
@@ -4891,6 +6693,34 @@
           }
         }
       },
+      "VendorRequest": {
+        "type": "object",
+        "required": [
+          "category"
+        ],
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "VerifyClaimRequest": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        }
+      },
       "VerifyEmailRequest": {
         "type": "object",
         "required": [
@@ -4952,6 +6782,14 @@
     {
       "name": "qa",
       "description": "Answers, voting, bounties"
+    },
+    {
+      "name": "network",
+      "description": "Organizations, connections, profiles"
+    },
+    {
+      "name": "careers",
+      "description": "Salaries, vendors, alerts, career paths"
     },
     {
       "name": "learning",
