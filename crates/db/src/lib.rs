@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 pub mod event_bus;
+pub mod search;
 
 pub use sqlx;
 
