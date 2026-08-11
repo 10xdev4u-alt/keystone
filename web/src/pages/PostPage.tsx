@@ -102,22 +102,26 @@ export function PostPage() {
     error: postErrorObj,
     refetch: refetchPost,
   } = usePost(id);
+  // Comments, related reading and the comment form all key off the canonical
+  // post UUID (resolved from the detail response), never the URL slug — those
+  // endpoints require a UUID.
+  const canonicalId = detail?.post?.id ?? id;
   const {
     data: thread,
     isLoading: commentsLoading,
     isError: commentsError,
     refetch: refetchComments,
-  } = useComments(id);
+  } = useComments(canonicalId);
 
   const {
     data: related,
     isLoading: relatedLoading,
-  } = useRelatedPosts(id);
+  } = useRelatedPosts(canonicalId);
 
   const { data: me, isLoading: meLoading } = useCurrentUser();
   const [comment, setComment] = useState("");
   const [commentError, setCommentError] = useState<string | null>(null);
-  const createComment = useCreateComment(id);
+  const createComment = useCreateComment(canonicalId);
 
   async function submitComment() {
     const body = comment.trim();
