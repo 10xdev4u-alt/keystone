@@ -12,4 +12,16 @@ ignore = [
     # only. `cargo tree -i rsa` on the default target prints nothing.
     # No patched release exists yet. Revisit if the MySQL driver is enabled.
     "RUSTSEC-2023-0071",
+    # RUSTSEC-2026-0098/0099/0104 — X.509 name-constraint parsing + CRL panic
+    # in `rustls-webpki` 0.101.7.
+    # Reachable ONLY through `aws-smithy-http-client` (the AWS SDK's HTTP
+    # client), which hard-pins the rustls 0.21 / webpki 0.101 line: `cargo
+    # update` resolves no patched 0.101.x, and no aws-sdk feature swaps in
+    # the fixed 0.103.x line (verified via `cargo tree -e features`). The
+    # affected paths are TLS certificate checks against S3/MinIO endpoints,
+    # not our own trust store. Revisit after an aws-sdk release that moves
+    # off rustls 0.21.
+    "RUSTSEC-2026-0098",
+    "RUSTSEC-2026-0099",
+    "RUSTSEC-2026-0104",
 ]
