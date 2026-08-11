@@ -19,6 +19,7 @@ vi.mock("../api/hooks", () => ({
     error: null,
     refetch: vi.fn(),
   })),
+  useCreatePost: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
   useEvents: vi.fn(() => ({
     data: { events: [] },
     isLoading: false,
@@ -76,7 +77,7 @@ describe("routing shells", () => {
 
   it("renders the app shell with sidebar nav under /me", async () => {
     renderAt("/me");
-    expect(await screen.findByRole("heading", { name: "My feed" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Sign in to see your feed" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Notifications" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Messages" })).toBeInTheDocument();
   });

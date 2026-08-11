@@ -17,6 +17,7 @@ import type { components, operations } from "./generated";
 type TokenResponse = components["schemas"]["TokenResponse"];
 type UserView = components["schemas"]["UserView"];
 type RegisterRequest = components["schemas"]["SignupRequest"];
+type CreatePostRequest = components["schemas"]["CreatePostRequest"];
 type LoginRequest = components["schemas"]["LoginRequest"];
 type PostListPage = components["schemas"]["PostListPage"];
 type PostDetailResponse = components["schemas"]["PostDetailResponse"];
@@ -54,7 +55,7 @@ type QueryOptions<T> = Omit<UseQueryOptions<T, ApiRequestError>, "queryKey" | "q
 
 /** The homepage feed — newest posts first, keyset-paginated. */
 export function usePosts(
-  params: { kind?: string; limit?: number; before?: string } = {},
+  params: { kind?: string; author?: string; limit?: number; before?: string } = {},
   options?: QueryOptions<PostListPage>,
 ) {
   return useQuery({
@@ -298,6 +299,28 @@ export function useUpdateNotificationPreferences(
     onSuccess: (data, vars, ctx, mutation) => {
       qc.setQueryData(["notifications", "preferences"], data);
       options?.onSuccess?.(data, vars, ctx, mutation);
+    },
+  });
+}
+
+/** Publish a new post (article, post, question or poll). */
+export function useCreatePost(
+  options?: UseMutationOptions<unknown, ApiRequestError, CreatePostRequest>,
+) {
+  const qc = useQueryClient();
+  const { onSuccess: userOnSuccess, ...rest } = options ?? {};
+  return useMutation({
+    ...rest,
+    mutationFn: async (payload) => {
+      const { data, error } = await client.POST("/api/v1/posts", {
+        body: payload,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data, vars, ctx, mutation) => {
+      qc.invalidateQueries({ queryKey: ["posts"] });
+      userOnSuccess?.(data, vars, ctx, mutation);
     },
   });
 }
