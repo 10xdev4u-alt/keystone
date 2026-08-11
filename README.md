@@ -34,16 +34,50 @@ docker run -d --name keystone-pg -p 5432:5432 \
   postgres:16-alpine
 
 # 2. Configure (templates only — real secrets are generated later, never committed)
-cp .env.example .env        # then set DATABASE_URL
+cp .env.example .env        # then set DATABASE_URL and a JWT key (see below)
 
 # 3. Run (applies migrations on boot)
 cargo run -p keystone-api
 
-# Health endpoints
+# 4. Frontend (separate terminal)
+cd web && npm install && npm run dev
+```
+
+The API **refuses to boot without a JWT key** — generate one:
+`openssl rand -base64 48`, put it in `JWT_PRIVATE_KEY_B64`. Full variable
+reference in [`docs/env-reference.md`](docs/env-reference.md).
+
+### Health endpoints
+
+```bash
 curl localhost:4000/healthz        # liveness
 curl localhost:4000/readyz         # readiness (checks DB)
 curl localhost:4000/api/v1/health  # app health JSON
 ```
+
+### Tests
+
+```bash
+# Backend unit + integration (integration suites self-skip without the URL)
+export TEST_DATABASE_URL=postgres://keystone:keystone_test@localhost:5432/keystone_test
+cargo test -p keystone-api -p keystone-db --features test-util
+
+# Gates CI enforces, run locally first
+cargo fmt --all --check
+cargo clippy --all-targets --all-features -- -D warnings
+
+# Frontend
+cd web && npm run lint && npx tsc -b && npx vitest run
+
+# OpenAPI → typed client regeneration (commit the diff)
+bash scripts/generate-client.sh
+```
+
+### Documentation
+
+- [`docs/env-reference.md`](docs/env-reference.md) — every env var, defaults, required set
+- [`docs/threat-model.md`](docs/threat-model.md) — security model, invariants, attacker scope
+- [`docs/operations.md`](docs/operations.md) — backup/restore, monitoring, day-two runbook
 
 ## Security posture
 
