@@ -19,6 +19,11 @@ export function ShellNav({ items, className }: { items: NavItem[]; className?: s
             >
               {item.icon}
               <span>{item.label}</span>
+              {item.badge ? (
+                <span className="shell-nav__badge" aria-label={`${item.badge} unread`}>
+                  {item.badge > 99 ? "99+" : item.badge}
+                </span>
+              ) : null}
             </NavLink>
           </li>
         ))}

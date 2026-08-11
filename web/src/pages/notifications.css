@@ -1,0 +1,142 @@
+.notifications {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.notifications__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.notifications__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.notifications__subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.notifications__mark-all {
+  padding: 0.5rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.notifications__mark-all:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.notifications__mark-all:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.notifications__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.notification {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.notification--unread {
+  border-color: var(--accent);
+  background: var(--surface-muted);
+}
+
+.notification__link,
+.notification__plain {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.notification__link:hover {
+  background: var(--surface-hover);
+}
+
+.notification__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 0.35rem;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.notification__dot[data-read] {
+  background: var(--accent);
+}
+
+.notification__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.notification__text {
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.notification--unread .notification__text {
+  font-weight: 600;
+}
+
+.notification__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+}
+
+.notification__kind {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.notification--skeleton {
+  min-height: 64px;
+}
+
+.notification__line {
+  width: 70%;
+  height: 1rem;
+}
+
+@media (min-width: 640px) {
+  .notifications {
+    padding-top: 2.5rem;
+  }
+}

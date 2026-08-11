@@ -16,6 +16,8 @@ export interface NavItem {
   roles?: string[];
   /** Exact match for active state (false = prefix match). */
   end?: boolean;
+  /** Unread-style counter shown on the item (e.g. notifications). */
+  badge?: number;
 }
 
 const HomeIcon = (

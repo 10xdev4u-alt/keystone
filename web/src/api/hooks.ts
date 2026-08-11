@@ -18,6 +18,9 @@ type TokenResponse = components["schemas"]["TokenResponse"];
 type UserView = components["schemas"]["UserView"];
 type RegisterRequest = components["schemas"]["SignupRequest"];
 type CreatePostRequest = components["schemas"]["CreatePostRequest"];
+type NotificationListResponse = components["schemas"]["NotificationListResponse"];
+type UnreadCountResponse = components["schemas"]["UnreadCountResponse"];
+type ReadReceiptResponse = components["schemas"]["ReadReceiptResponse"];
 type LoginRequest = components["schemas"]["LoginRequest"];
 type PostListPage = components["schemas"]["PostListPage"];
 type PostDetailResponse = components["schemas"]["PostDetailResponse"];
@@ -298,6 +301,58 @@ export function useUpdateNotificationPreferences(
     },
     onSuccess: (data, vars, ctx, mutation) => {
       qc.setQueryData(["notifications", "preferences"], data);
+      options?.onSuccess?.(data, vars, ctx, mutation);
+    },
+  });
+}
+
+/** The caller's notification feed (read state derived from the cursor). */
+export function useNotifications(options?: QueryOptions<NotificationListResponse>) {
+  return useQuery({
+    queryKey: ["notifications"],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/notifications");
+      if (error) throw error;
+      if (!data) throw new Error("Empty notifications response");
+      return data;
+    },
+    staleTime: 15_000,
+    ...options,
+  });
+}
+
+/** The caller's unread notification count (for nav badges). */
+export function useUnreadCount(options?: QueryOptions<UnreadCountResponse>) {
+  return useQuery({
+    queryKey: ["notifications", "unread"],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/notifications/unread-count");
+      if (error) throw error;
+      if (!data) throw new Error("Empty unread response");
+      return data;
+    },
+    staleTime: 30_000,
+    ...options,
+  });
+}
+
+/** Mark notifications read — up to an id, or all when omitted. */
+export function useMarkNotificationsRead(
+  options?: UseMutationOptions<ReadReceiptResponse, ApiRequestError, { up_to?: number | null }>,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    ...options,
+    mutationFn: async (payload) => {
+      const { data, error } = await client.POST("/api/v1/notifications/read", {
+        body: payload,
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty read response");
+      return data;
+    },
+    onSuccess: (data, vars, ctx, mutation) => {
+      qc.invalidateQueries({ queryKey: ["notifications"] });
       options?.onSuccess?.(data, vars, ctx, mutation);
     },
   });
