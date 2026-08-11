@@ -35,6 +35,9 @@ type SearchResponse = components["schemas"]["SearchResponse"];
 type ProfileResponse = components["schemas"]["ProfileResponse"];
 type ProfileView = components["schemas"]["ProfileView"];
 type SetProfileRequest = components["schemas"]["SetProfileRequest"];
+type AdminStatusResponse = components["schemas"]["AdminStatusResponse"];
+type AdminUserList = components["schemas"]["AdminUserList"];
+type ReportQueueResponse = components["schemas"]["ReportQueueResponse"];
 
 /**
  * Caller-facing options for query wrapper hooks. The hook owns `queryKey` and
@@ -509,6 +512,92 @@ export function useUpdateProfile(
     onSuccess: (data, vars, ctx, mutation) => {
       qc.invalidateQueries({ queryKey: ["profiles"] });
       qc.invalidateQueries({ queryKey: ["me"] });
+      userOnSuccess?.(data, vars, ctx, mutation);
+    },
+  });
+}
+
+// ── Admin ──────────────────────────────────────────────────────────────────
+
+/** Instance stats for the admin overview. */
+export function useAdminStatus(options?: QueryOptions<AdminStatusResponse>) {
+  return useQuery({
+    queryKey: ["admin", "status"],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/admin/status");
+      if (error) throw error;
+      if (!data) throw new Error("Empty admin status response");
+      return data;
+    },
+    staleTime: 30_000,
+    retry: false,
+    ...options,
+  });
+}
+
+/** Admin user directory — newest first, paginated. */
+export function useAdminUsers(
+  query: operations["admin_users"]["parameters"]["query"] = {},
+  options?: QueryOptions<AdminUserList>,
+) {
+  return useQuery({
+    queryKey: ["admin", "users", query],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/admin/users", {
+        params: { query },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty admin users response");
+      return data;
+    },
+    staleTime: 30_000,
+    retry: false,
+    ...options,
+  });
+}
+
+/** Staff moderation queue — open reports. */
+export function useReportQueue(
+  query: operations["report_queue"]["parameters"]["query"] = {},
+  options?: QueryOptions<ReportQueueResponse>,
+) {
+  return useQuery({
+    queryKey: ["admin", "reports", query],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/moderation/reports", {
+        params: { query },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty report queue response");
+      return data;
+    },
+    staleTime: 30_000,
+    retry: false,
+    ...options,
+  });
+}
+
+/** Resolve an open report (staff only). */
+export function useResolveReport(
+  options?: UseMutationOptions<
+    void,
+    ApiRequestError,
+    { id: string; resolution_note?: string }
+  >,
+) {
+  const qc = useQueryClient();
+  const { onSuccess: userOnSuccess, ...rest } = options ?? {};
+  return useMutation({
+    ...rest,
+    mutationFn: async ({ id, resolution_note }) => {
+      const { error } = await client.POST(
+        "/api/v1/moderation/reports/{id}/resolve",
+        { params: { path: { id } }, body: { resolution_note } },
+      );
+      if (error) throw error;
+    },
+    onSuccess: (data, vars, ctx, mutation) => {
+      qc.invalidateQueries({ queryKey: ["admin", "reports"] });
       userOnSuccess?.(data, vars, ctx, mutation);
     },
   });

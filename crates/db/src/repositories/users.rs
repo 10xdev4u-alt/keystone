@@ -181,6 +181,25 @@ impl Users {
         Ok(count as u32)
     }
 
+    /// Admin user directory — newest first, paginated. Exposes the fields
+    /// moderation needs (role, status, verification) without credentials.
+    pub async fn list_admin(&self, limit: i64, offset: i64) -> Result<Vec<User>, RepoError> {
+        let rows = sqlx::query_as::<_, User>(
+            "SELECT id, email, email_lower, password_hash, role, status, username,
+                    is_verified, last_login_at, created_at
+             FROM users
+             WHERE deleted_at IS NULL
+             ORDER BY created_at DESC
+             LIMIT $1 OFFSET $2",
+        )
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(RepoError::from)?;
+        Ok(rows)
+    }
+
     /// Replace the password hash (password reset flow). The caller has
     /// already validated the reset token and the new password's strength.
     pub async fn update_password(&self, id: Uuid, new_hash: &str) -> Result<(), RepoError> {

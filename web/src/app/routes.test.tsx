@@ -31,6 +31,28 @@ vi.mock("../api/hooks", () => ({
     error: null,
     refetch: vi.fn(),
   })),
+  useAdminStatus: vi.fn(() => ({
+    data: { status: "ok", uptime_secs: 60, users: 1, live_sessions: 0 },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+  useReportQueue: vi.fn(() => ({
+    data: { reports: [], limit: 50, offset: 0 },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+  useAdminUsers: vi.fn(() => ({
+    data: { users: [], limit: 50, offset: 0 },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+  useResolveReport: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false, error: null })),
 }));
 
 function renderAt(path: string) {

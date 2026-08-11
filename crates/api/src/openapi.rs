@@ -173,6 +173,8 @@ use utoipa::{Modify, OpenApi};
         crate::moderation::report_queue,
         crate::moderation::resolve_report,
         crate::moderation::upsert_review,
+        crate::admin_status,
+        crate::admin_users,
         crate::moderation::list_reviews,
     ),
     components(schemas(
@@ -270,6 +272,11 @@ use utoipa::{Modify, OpenApi};
         crate::files::RegisterRequest,
         crate::files::ListParams,
         crate::moderation::ReportQueueQuery,
+        crate::moderation::ReportView,
+        crate::moderation::ReportQueueResponse,
+        crate::AdminStatusResponse,
+        crate::AdminUserView,
+        crate::AdminUserList,
     )),
     modifiers(&ApiDoc),
     tags(

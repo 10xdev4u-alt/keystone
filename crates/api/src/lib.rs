@@ -28,14 +28,14 @@ pub mod realtime;
 pub mod search_api;
 pub mod social;
 
-use axum::extract::State;
+use crate::error::{ApiError, ApiResult};
+use axum::extract::{Query, State};
 use axum::http::header::{self, HeaderName, HeaderValue};
 use axum::http::{Method, StatusCode};
 use axum::middleware as axum_mw;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use error::ApiError;
 use serde_json::json;
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -468,6 +468,7 @@ pub fn router(state: AppState) -> Router {
         .merge(
             Router::new()
                 .route("/api/v1/admin/status", get(admin_status))
+                .route("/api/v1/admin/users", get(admin_users))
                 .route_layer(axum_mw::from_fn_with_state(
                     state.clone(),
                     rbac::require_admin,
@@ -541,8 +542,51 @@ async fn not_found() -> ApiError {
     ApiError::NotFound
 }
 
+/// Instance stats for the admin overview.
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct AdminStatusResponse {
+    pub status: String,
+    pub uptime_secs: u64,
+    pub users: Option<i64>,
+    pub live_sessions: Option<i64>,
+}
+
+/// One row of the admin user directory.
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct AdminUserView {
+    pub id: String,
+    pub email: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
+    pub role: String,
+    pub status: String,
+    pub is_verified: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_login_at: Option<String>,
+    pub created_at: String,
+}
+
+/// Admin user directory page.
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct AdminUserList {
+    pub users: Vec<AdminUserView>,
+    pub limit: i64,
+    pub offset: i64,
+}
+
 /// Operator visibility: instance stats. RBAC-guarded (admin/super_admin).
-async fn admin_status(State(state): State<AppState>) -> Json<serde_json::Value> {
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/status",
+    responses(
+        (status = 200, description = "Instance stats", body = AdminStatusResponse),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not an admin"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "admin"
+)]
+pub async fn admin_status(State(state): State<AppState>) -> ApiResult<Json<AdminStatusResponse>> {
     let users = sqlx::query_scalar::<_, i64>("SELECT count(*) FROM users WHERE deleted_at IS NULL")
         .fetch_one(&state.pool)
         .await;
@@ -551,21 +595,80 @@ async fn admin_status(State(state): State<AppState>) -> Json<serde_json::Value> 
     )
     .fetch_one(&state.pool)
     .await;
-
+    let uptime = state.started_at.elapsed().as_secs();
     match (users, live_sessions) {
-        (Ok(users), Ok(live_sessions)) => Json(json!({
-            "status": "ok",
-            "uptime_secs": state.started_at.elapsed().as_secs(),
-            "users": users,
-            "live_sessions": live_sessions,
+        (Ok(users), Ok(live_sessions)) => Ok(Json(AdminStatusResponse {
+            status: "ok".into(),
+            uptime_secs: uptime,
+            users: Some(users),
+            live_sessions: Some(live_sessions),
         })),
-        _ => Json(json!({
-            "status": "degraded",
-            "uptime_secs": state.started_at.elapsed().as_secs(),
-            "users": null,
-            "live_sessions": null,
+        _ => Ok(Json(AdminStatusResponse {
+            status: "degraded".into(),
+            uptime_secs: uptime,
+            users: None,
+            live_sessions: None,
         })),
     }
+}
+
+/// Admin user directory. RBAC-guarded (admin/super_admin).
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/users",
+    params(
+        ("limit" = Option<i64>, Query, description = "Page size (1..=100)"),
+        ("offset" = Option<i64>, Query, description = "Page offset"),
+    ),
+    responses(
+        (status = 200, description = "User directory page", body = AdminUserList),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not an admin"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "admin"
+)]
+pub async fn admin_users(
+    State(state): State<AppState>,
+    Query(query): Query<AdminPageQuery>,
+) -> ApiResult<Json<AdminUserList>> {
+    let limit = query.limit.clamp(1, 100);
+    let offset = query.offset.max(0);
+    let users = keystone_db::repositories::users::Users::new(state.pool.clone());
+    let rows = users
+        .list_admin(limit, offset)
+        .await
+        .map_err(auth::map_repo_error)?;
+    let items = rows
+        .into_iter()
+        .map(|u| AdminUserView {
+            id: u.id.to_string(),
+            email: u.email,
+            username: u.username,
+            role: u.role,
+            status: u.status,
+            is_verified: u.is_verified,
+            last_login_at: u.last_login_at.map(|t| t.to_rfc3339()),
+            created_at: u.created_at.to_rfc3339(),
+        })
+        .collect();
+    Ok(Json(AdminUserList {
+        users: items,
+        limit,
+        offset,
+    }))
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct AdminPageQuery {
+    #[serde(default = "admin_default_limit")]
+    pub limit: i64,
+    #[serde(default)]
+    pub offset: i64,
+}
+
+fn admin_default_limit() -> i64 {
+    50
 }
 
 #[cfg(test)]
