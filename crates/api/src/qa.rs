@@ -19,6 +19,7 @@ use keystone_db::repositories::posts::Posts;
 use keystone_db::repositories::qa::{NewBounty, Qa};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 const ANSWER_BODY_MAX: usize = 20_000;
@@ -58,30 +59,43 @@ async fn require_question_author(
     Ok(())
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateAnswerRequest {
     pub body: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct VoteAnswerRequest {
     /// -1, 0 (remove), or 1.
     pub vote: i16,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateBountyRequest {
     pub amount: i32,
     pub expires_at: chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AwardBountyRequest {
     pub answer_id: Uuid,
 }
 
 // ── Answers ────────────────────────────────────────────────────────────────
 
+/// Answer a question.
+#[utoipa::path(
+    post,
+    path = "/api/v1/posts/{id}/answers",
+    request_body = CreateAnswerRequest,
+    params(("id" = Uuid, Path, description = "Question post id")),
+    responses(
+        (status = 201, description = "Answer created", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "qa"
+)]
 pub async fn create_answer(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -120,6 +134,16 @@ pub async fn create_answer(
     ))
 }
 
+/// List answers for a question (accepted first, then by votes).
+#[utoipa::path(
+    get,
+    path = "/api/v1/posts/{id}/answers",
+    params(("id" = Uuid, Path, description = "Question post id")),
+    responses(
+        (status = 200, description = "Answers", body = Value),
+    ),
+    tag = "qa"
+)]
 pub async fn list_answers(
     State(state): State<AppState>,
     Path(question_id): Path<Uuid>,
@@ -143,6 +167,19 @@ pub async fn list_answers(
     Ok(Json(json!({ "answers": items })))
 }
 
+/// Vote on an answer (-1, 0 to remove, +1). One vote per user.
+#[utoipa::path(
+    put,
+    path = "/api/v1/answers/{id}/vote",
+    request_body = VoteAnswerRequest,
+    params(("id" = Uuid, Path, description = "Answer id")),
+    responses(
+        (status = 204, description = "Vote recorded"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "qa"
+)]
 pub async fn vote_answer(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -160,6 +197,22 @@ pub async fn vote_answer(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Accept an answer. Question author or staff only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/posts/{id}/answers/{answer_id}/accept",
+    params(
+        ("id" = Uuid, Path, description = "Question post id"),
+        ("answer_id" = Uuid, Path, description = "Answer id"),
+    ),
+    responses(
+        (status = 204, description = "Answer accepted"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the question author"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "qa"
+)]
 pub async fn accept_answer(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -188,6 +241,20 @@ pub async fn accept_answer(
 
 // ── Bounties ───────────────────────────────────────────────────────────────
 
+/// Open a bounty on a question. Question author only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/posts/{id}/bounty",
+    request_body = CreateBountyRequest,
+    params(("id" = Uuid, Path, description = "Question post id")),
+    responses(
+        (status = 201, description = "Bounty opened", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the question author"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "qa"
+)]
 pub async fn create_bounty(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -242,6 +309,16 @@ pub async fn create_bounty(
     ))
 }
 
+/// Current bounty state for a question.
+#[utoipa::path(
+    get,
+    path = "/api/v1/posts/{id}/bounty",
+    params(("id" = Uuid, Path, description = "Question post id")),
+    responses(
+        (status = 200, description = "Bounty state", body = Value),
+    ),
+    tag = "qa"
+)]
 pub async fn get_bounty(
     State(state): State<AppState>,
     Path(question_id): Path<Uuid>,
@@ -266,6 +343,20 @@ pub async fn get_bounty(
     }
 }
 
+/// Award a bounty to an answer. Question author only; one award per bounty.
+#[utoipa::path(
+    post,
+    path = "/api/v1/bounties/{id}/award",
+    request_body = AwardBountyRequest,
+    params(("id" = Uuid, Path, description = "Bounty id")),
+    responses(
+        (status = 200, description = "Bounty awarded", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the question author"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "qa"
+)]
 pub async fn award_bounty(
     State(state): State<AppState>,
     auth_user: AuthUser,

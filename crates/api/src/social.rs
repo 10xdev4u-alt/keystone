@@ -23,6 +23,7 @@ use keystone_db::repositories::polls::Polls;
 use keystone_db::repositories::posts::Posts;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 const NAME_MAX: usize = 100;
@@ -61,7 +62,7 @@ async fn community_staff_role(
 
 // ── Request / response types ───────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateCommunityRequest {
     pub name: String,
     #[serde(default = "default_visibility")]
@@ -74,27 +75,27 @@ fn default_visibility() -> String {
     "public".to_owned()
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AddCommunityPostRequest {
     pub post_id: Uuid,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct SetMemberRoleRequest {
     pub role: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AddPollOptionRequest {
     pub text: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct VotePollRequest {
     pub option_id: Uuid,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct PageQuery {
     #[serde(default = "default_limit")]
     pub limit: i64,
@@ -120,6 +121,18 @@ fn community_view(c: &keystone_db::repositories::communities::Community) -> Valu
 
 // ── Communities ────────────────────────────────────────────────────────────
 
+/// Create a community. The creator becomes the owner.
+#[utoipa::path(
+    post,
+    path = "/api/v1/communities",
+    request_body = CreateCommunityRequest,
+    responses(
+        (status = 201, description = "Community created", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "social"
+)]
 pub async fn create_community(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -172,6 +185,17 @@ pub async fn create_community(
     ))
 }
 
+/// Fetch a community by slug.
+#[utoipa::path(
+    get,
+    path = "/api/v1/communities/{slug}",
+    params(("slug" = String, Path, description = "Community slug")),
+    responses(
+        (status = 200, description = "Community", body = Value),
+        (status = 404, description = "Community not found"),
+    ),
+    tag = "social"
+)]
 pub async fn get_community(
     State(state): State<AppState>,
     Path(slug): Path<String>,
@@ -185,6 +209,19 @@ pub async fn get_community(
     Ok(Json(json!({ "community": community_view(&community) })))
 }
 
+/// List communities (paged).
+#[utoipa::path(
+    get,
+    path = "/api/v1/communities",
+    params(
+        ("limit" = Option<i64>, Query, description = "Page size"),
+        ("offset" = Option<i64>, Query, description = "Page offset"),
+    ),
+    responses(
+        (status = 200, description = "Communities page", body = Value),
+    ),
+    tag = "social"
+)]
 pub async fn list_communities(
     State(state): State<AppState>,
     Query(query): Query<PageQuery>,
@@ -198,6 +235,19 @@ pub async fn list_communities(
     Ok(Json(json!({ "communities": items })))
 }
 
+/// Join a community.
+#[utoipa::path(
+    post,
+    path = "/api/v1/communities/{slug}/join",
+    params(("slug" = String, Path, description = "Community slug")),
+    responses(
+        (status = 204, description = "Joined"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 404, description = "Community not found"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "social"
+)]
 pub async fn join_community(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -225,6 +275,18 @@ pub async fn join_community(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Leave a community.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/communities/{slug}/leave",
+    params(("slug" = String, Path, description = "Community slug")),
+    responses(
+        (status = 204, description = "Left"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "social"
+)]
 pub async fn leave_community(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -255,6 +317,17 @@ pub async fn leave_community(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// List a community's members.
+#[utoipa::path(
+    get,
+    path = "/api/v1/communities/{slug}/members",
+    params(("slug" = String, Path, description = "Community slug")),
+    responses(
+        (status = 200, description = "Members", body = Value),
+        (status = 404, description = "Community not found"),
+    ),
+    tag = "social"
+)]
 pub async fn list_members(
     State(state): State<AppState>,
     Path(slug): Path<String>,
@@ -282,6 +355,23 @@ pub async fn list_members(
     Ok(Json(json!({ "members": items })))
 }
 
+/// Change a member's role. Community staff only.
+#[utoipa::path(
+    patch,
+    path = "/api/v1/communities/{slug}/members/{member_id}",
+    request_body = SetMemberRoleRequest,
+    params(
+        ("slug" = String, Path, description = "Community slug"),
+        ("member_id" = Uuid, Path, description = "Member user id"),
+    ),
+    responses(
+        (status = 200, description = "Updated member", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Insufficient role"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "social"
+)]
 pub async fn set_member_role(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -330,6 +420,20 @@ pub async fn set_member_role(
 
 // ── Community posts ────────────────────────────────────────────────────────
 
+/// Attach an existing post to a community.
+#[utoipa::path(
+    post,
+    path = "/api/v1/communities/{slug}/posts",
+    request_body = AddCommunityPostRequest,
+    params(("slug" = String, Path, description = "Community slug")),
+    responses(
+        (status = 204, description = "Post attached"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not a community member"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "social"
+)]
 pub async fn add_community_post(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -379,6 +483,21 @@ pub async fn add_community_post(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// List a community's posts (paged).
+#[utoipa::path(
+    get,
+    path = "/api/v1/communities/{slug}/posts",
+    params(
+        ("slug" = String, Path, description = "Community slug"),
+        ("limit" = Option<i64>, Query, description = "Page size"),
+        ("offset" = Option<i64>, Query, description = "Page offset"),
+    ),
+    responses(
+        (status = 200, description = "Posts page", body = Value),
+        (status = 404, description = "Community not found"),
+    ),
+    tag = "social"
+)]
 pub async fn list_community_posts(
     State(state): State<AppState>,
     Path(slug): Path<String>,
@@ -409,6 +528,22 @@ pub async fn list_community_posts(
     Ok(Json(json!({ "posts": items })))
 }
 
+/// Pin a post to the top of a community. Community staff only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/communities/{slug}/posts/{post_id}/pin",
+    params(
+        ("slug" = String, Path, description = "Community slug"),
+        ("post_id" = Uuid, Path, description = "Post id"),
+    ),
+    responses(
+        (status = 204, description = "Pinned"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Insufficient role"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "social"
+)]
 pub async fn pin_community_post(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -417,6 +552,22 @@ pub async fn pin_community_post(
     set_pin(state, auth_user, slug, post_id, true).await
 }
 
+/// Unpin a post. Community staff only.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/communities/{slug}/posts/{post_id}/pin",
+    params(
+        ("slug" = String, Path, description = "Community slug"),
+        ("post_id" = Uuid, Path, description = "Post id"),
+    ),
+    responses(
+        (status = 204, description = "Unpinned"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Insufficient role"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "social"
+)]
 pub async fn unpin_community_post(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -463,6 +614,22 @@ async fn set_pin(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Remove a post from a community. Community staff only.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/communities/{slug}/posts/{post_id}",
+    params(
+        ("slug" = String, Path, description = "Community slug"),
+        ("post_id" = Uuid, Path, description = "Post id"),
+    ),
+    responses(
+        (status = 204, description = "Post removed"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Insufficient role"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "social"
+)]
 pub async fn remove_community_post(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -497,6 +664,20 @@ pub async fn remove_community_post(
 
 // ── Polls ──────────────────────────────────────────────────────────────────
 
+/// Add an option to a poll. Post author only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/posts/{id}/poll/options",
+    request_body = AddPollOptionRequest,
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 201, description = "Option added", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the post author"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "social"
+)]
 pub async fn add_poll_option(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -531,6 +712,19 @@ pub async fn add_poll_option(
     ))
 }
 
+/// Cast (or change) the caller's poll vote.
+#[utoipa::path(
+    put,
+    path = "/api/v1/posts/{id}/poll/votes",
+    request_body = VotePollRequest,
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 204, description = "Vote recorded"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "social"
+)]
 pub async fn vote_poll(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -549,6 +743,18 @@ pub async fn vote_poll(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Remove the caller's poll vote.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/posts/{id}/poll/votes",
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 204, description = "Vote removed"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "social"
+)]
 pub async fn remove_poll_vote(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -562,6 +768,17 @@ pub async fn remove_poll_vote(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Poll state for a post (options + tallies + caller vote).
+#[utoipa::path(
+    get,
+    path = "/api/v1/posts/{id}/poll",
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 200, description = "Poll with tallies", body = Value),
+        (status = 404, description = "Post or poll not found"),
+    ),
+    tag = "social"
+)]
 pub async fn get_poll(
     State(state): State<AppState>,
     maybe: MaybeUser,
@@ -596,6 +813,19 @@ pub async fn get_poll(
 
 // ── Discussion locking ─────────────────────────────────────────────────────
 
+/// Lock a post (refuses new comments). Author or staff only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/posts/{id}/lock",
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 204, description = "Locked"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the author and not staff"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "social"
+)]
 pub async fn lock_post(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -604,6 +834,19 @@ pub async fn lock_post(
     set_lock(state, auth_user, post_id, true).await
 }
 
+/// Unlock a post. Author or staff only.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/posts/{id}/lock",
+    params(("id" = Uuid, Path, description = "Post id")),
+    responses(
+        (status = 204, description = "Unlocked"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the author and not staff"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "social"
+)]
 pub async fn unlock_post(
     State(state): State<AppState>,
     auth_user: AuthUser,
