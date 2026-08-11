@@ -52,6 +52,7 @@ async fn posts_create_read_update_version_and_soft_delete() {
             slug: "hello-world",
             body: "First post body.",
             summary: Some("A greeting"),
+            cover_image_url: None,
             visibility: "public",
         })
         .await
@@ -100,6 +101,7 @@ async fn posts_create_read_update_version_and_soft_delete() {
                 title: Some("Hello World v2"),
                 body: "Updated body.",
                 summary: None,
+                cover_image_url: None,
                 change_note: Some("fixed typo"),
                 editor_id: author,
             },
@@ -139,6 +141,7 @@ async fn post_slug_collision_surfaces_unique_violation() {
             slug: "same-slug",
             body: "first",
             summary: None,
+            cover_image_url: None,
             visibility: "public",
         })
         .await
@@ -152,6 +155,7 @@ async fn post_slug_collision_surfaces_unique_violation() {
             slug: "same-slug",
             body: "second",
             summary: None,
+            cover_image_url: None,
             visibility: "public",
         })
         .await
@@ -182,6 +186,7 @@ async fn comments_nest_within_a_post_only() {
             slug: "post-a",
             body: "a",
             summary: None,
+            cover_image_url: None,
             visibility: "public",
         })
         .await
@@ -194,6 +199,7 @@ async fn comments_nest_within_a_post_only() {
             slug: "post-b",
             body: "b",
             summary: None,
+            cover_image_url: None,
             visibility: "public",
         })
         .await
@@ -274,6 +280,7 @@ async fn reactions_upsert_and_remove() {
             slug: "react-me",
             body: "hi",
             summary: None,
+            cover_image_url: None,
             visibility: "public",
         })
         .await
@@ -316,6 +323,7 @@ async fn bookmarks_add_list_remove() {
             slug: "save-me",
             body: "hi",
             summary: None,
+            cover_image_url: None,
             visibility: "public",
         })
         .await
@@ -358,6 +366,7 @@ async fn counters_never_drift_under_concurrent_writes() {
             slug: "stress-me",
             body: "hi",
             summary: None,
+            cover_image_url: None,
             visibility: "public",
         })
         .await
@@ -417,6 +426,7 @@ async fn tags_ensure_is_case_insensitive_and_attachments_work() {
             slug: "tagged",
             body: "hi",
             summary: None,
+            cover_image_url: None,
             visibility: "public",
         })
         .await
@@ -473,6 +483,7 @@ async fn series_append_ordered_posts_and_soft_delete() {
                 slug: &format!("my-series-part-{n}"),
                 body: "body",
                 summary: None,
+                cover_image_url: None,
                 visibility: "public",
             })
             .await
@@ -696,6 +707,7 @@ async fn feed_keyset_pagination_is_total_and_stable() {
                 slug: &format!("page-{i}"),
                 body: "hi",
                 summary: None,
+                cover_image_url: None,
                 visibility: "public",
             })
             .await
@@ -759,6 +771,7 @@ async fn related_ranks_tag_overlap_then_recency_excluding_self() {
                 slug,
                 body: "body",
                 summary: None,
+                cover_image_url: None,
                 visibility: "public",
             })
             .await
@@ -788,4 +801,100 @@ async fn related_ranks_tag_overlap_then_recency_excluding_self() {
     );
     assert_eq!(related[0].id, close, "higher tag overlap ranks first");
     assert_eq!(related[1].id, loose, "lower overlap ranks second");
+}
+
+#[tokio::test]
+async fn cover_art_is_persisted_and_editable() {
+    let Some(pool) = test_pool().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let author = make_user(&pool, "cover@example.com").await;
+    let posts = Posts::new(pool.clone());
+
+    // Create with cover art.
+    let created = posts
+        .create(NewPost {
+            author_id: author,
+            kind: "article",
+            title: Some("Covered"),
+            slug: "covered-post",
+            body: "Body.",
+            summary: None,
+            cover_image_url: Some("https://cdn.example.com/covers/a.jpg"),
+            visibility: "public",
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        created.cover_image_url.as_deref(),
+        Some("https://cdn.example.com/covers/a.jpg"),
+        "cover survives create"
+    );
+
+    // Round-trips through every read path.
+    let by_id = posts.get_by_id(created.id).await.unwrap().unwrap();
+    assert_eq!(by_id.cover_image_url, created.cover_image_url);
+    let by_slug = posts.get_by_slug("covered-post").await.unwrap().unwrap();
+    assert_eq!(by_slug.cover_image_url, created.cover_image_url);
+    let page = posts.list(None, None, 10, None).await.unwrap();
+    assert!(page
+        .posts
+        .iter()
+        .any(|p| p.post.id == created.id && p.post.cover_image_url.is_some()));
+
+    // Update can clear it (None) or swap it.
+    let cleared = posts
+        .update(
+            created.id,
+            PostUpdate {
+                title: Some("Covered"),
+                body: "Body.",
+                summary: None,
+                cover_image_url: None,
+                change_note: Some("removed cover"),
+                editor_id: author,
+            },
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(cleared.cover_image_url, None, "update clears cover");
+
+    let swapped = posts
+        .update(
+            created.id,
+            PostUpdate {
+                title: Some("Covered"),
+                body: "Body.",
+                summary: None,
+                cover_image_url: Some("https://cdn.example.com/covers/b.jpg"),
+                change_note: Some("new cover"),
+                editor_id: author,
+            },
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        swapped.cover_image_url.as_deref(),
+        Some("https://cdn.example.com/covers/b.jpg"),
+        "update swaps cover"
+    );
+
+    // Default is None when the field is omitted entirely.
+    let bare = posts
+        .create(NewPost {
+            author_id: author,
+            kind: "post",
+            title: None,
+            slug: "bare-post",
+            body: "Body.",
+            summary: None,
+            cover_image_url: None,
+            visibility: "public",
+        })
+        .await
+        .unwrap();
+    assert_eq!(bare.cover_image_url, None);
 }

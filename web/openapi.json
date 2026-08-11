@@ -6399,6 +6399,13 @@
           "body": {
             "type": "string"
           },
+          "cover_image_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Cover art URL — optional presentation metadata. Not an inline\nresource: readers always load it with `referrerpolicy` + lazy\nloading, and the value is opaque to the renderer."
+          },
           "kind": {
             "type": "string"
           },
@@ -7176,7 +7183,6 @@
       },
       "PostView": {
         "type": "object",
-        "description": "Full post — the reader view contract.",
         "required": [
           "id",
           "author_id",
@@ -7200,6 +7206,13 @@
           "body_html": {
             "type": "string",
             "description": "Markdown rendered to sanitized HTML server-side (see `keystone_db::markdown`)."
+          },
+          "cover_image_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Cover art URL — optional presentation metadata, loaded lazily and\nwithout referrer by the reader."
           },
           "created_at": {
             "type": "string"
@@ -7942,6 +7955,12 @@
             "type": "string"
           },
           "change_note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cover_image_url": {
             "type": [
               "string",
               "null"

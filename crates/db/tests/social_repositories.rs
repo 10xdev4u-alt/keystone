@@ -43,6 +43,7 @@ async fn make_post(pool: &PgPool, author: Uuid, kind: &str, slug: &str) -> Uuid 
             slug,
             body: "body",
             summary: None,
+            cover_image_url: None,
             visibility: "public",
         })
         .await
