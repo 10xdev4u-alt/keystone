@@ -394,6 +394,35 @@ pub async fn get_post(
     Ok(Json(json!({ "post": post_view(&post) })))
 }
 
+/// A single post in a list page — the feed card contract.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct PostListItem {
+    pub id: String,
+    pub author_id: String,
+    pub kind: String,
+    pub title: String,
+    pub slug: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    pub visibility: String,
+    pub view_count: i64,
+    pub comment_count: i64,
+    pub reaction_count: i64,
+    pub bookmark_count: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub published_at: Option<String>,
+    pub created_at: String,
+}
+
+/// Keyset page of posts.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct PostListPage {
+    pub posts: Vec<PostListItem>,
+    pub limit: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
+}
+
 /// List posts with keyset pagination (before cursor from `next_cursor`).
 #[utoipa::path(
     get,
@@ -405,7 +434,7 @@ pub async fn get_post(
         ("before" = Option<String>, Query, description = "Keyset cursor from the previous page"),
     ),
     responses(
-        (status = 200, description = "Page of posts + next_cursor", body = Value),
+        (status = 200, description = "Page of posts + next_cursor", body = PostListPage),
     ),
     tag = "content"
 )]

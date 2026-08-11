@@ -16,6 +16,9 @@ const Placeholder = lazy(() =>
   })),
 );
 
+const HomePage = lazy(() =>
+  import("../pages/HomePage").then((m) => ({ default: m.HomePage })),
+);
 const LoginPage = lazy(() =>
   import("../pages/auth/LoginPage").then((m) => ({ default: m.LoginPage })),
 );
@@ -48,8 +51,8 @@ export const routesConfig: RouteObject[] = [
     element: <PublicLayout />,
     errorElement: <RouteErrorBoundary />,
     children: [
-      { path: "/", element: withSuspense(<Placeholder title="Home" />) },
-      { path: "/posts", element: withSuspense(<Placeholder title="Posts" />) },
+      { path: "/", element: withSuspense(<HomePage />) },
+      { path: "/posts", element: withSuspense(<HomePage />) },
       { path: "/posts/:id", element: withSuspense(<Placeholder title="Post" />) },
       { path: "/communities", element: withSuspense(<Placeholder title="Communities" />) },
       { path: "/communities/:slug", element: withSuspense(<Placeholder title="Community" />) },

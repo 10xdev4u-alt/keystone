@@ -18,6 +18,29 @@ type TokenResponse = components["schemas"]["TokenResponse"];
 type UserView = components["schemas"]["UserView"];
 type RegisterRequest = components["schemas"]["SignupRequest"];
 type LoginRequest = components["schemas"]["LoginRequest"];
+type PostListPage = components["schemas"]["PostListPage"];
+
+// ── Content ──────────────────────────────────────────────────────────────────
+
+/** The homepage feed — newest posts first, keyset-paginated. */
+export function usePosts(
+  params: { kind?: string; limit?: number; before?: string } = {},
+  options?: UseQueryOptions<PostListPage, ApiRequestError>,
+) {
+  return useQuery({
+    queryKey: ["posts", params],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/posts", {
+        params: { query: params },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty posts response");
+      return data;
+    },
+    staleTime: 15_000,
+    ...options,
+  });
+}
 
 // ── Auth ────────────────────────────────────────────────────────────────────
 

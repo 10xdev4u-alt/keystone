@@ -184,6 +184,7 @@ use utoipa::{Modify, OpenApi};
         crate::content::ResolveReportRequest,
         crate::content::UpsertReviewRequest,
         crate::content::PostQuery,
+        crate::content::PostListPage,
         crate::content::ReviewQuery,
         crate::social::CreateCommunityRequest,
         crate::social::AddCommunityPostRequest,

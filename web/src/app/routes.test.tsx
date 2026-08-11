@@ -1,10 +1,23 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { expectNoViolations } from "../lib/test-utils";
 import { routesConfig } from "./routes";
 import { RouteErrorBoundary } from "./ErrorBoundary";
+
+// The real homepage hits the network via usePosts; stub it so shell tests
+// assert routing, not data fetching.
+vi.mock("../api/hooks", () => ({
+  usePosts: vi.fn(() => ({
+    data: { posts: [], limit: 20, next_cursor: null },
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+}));
 
 function renderAt(path: string) {
   const router = createMemoryRouter(routesConfig, { initialEntries: [path] });
@@ -12,10 +25,12 @@ function renderAt(path: string) {
 }
 
 describe("routing shells", () => {
-  it("renders the public shell at / with the Home placeholder", async () => {
+  it("renders the public shell at / with the real homepage", async () => {
     renderAt("/");
     // Lazy module resolves asynchronously.
-    expect(await screen.findByRole("heading", { name: "Home" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Fresh from the community" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("banner")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Primary" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Communities" })).toBeInTheDocument();
@@ -37,7 +52,7 @@ describe("routing shells", () => {
   it("navigates between routes via nav links", async () => {
     const user = userEvent.setup();
     renderAt("/");
-    await screen.findByRole("heading", { name: "Home" });
+    await screen.findByRole("heading", { name: "Fresh from the community" });
     await user.click(screen.getByRole("link", { name: "Events" }));
     expect(await screen.findByRole("heading", { name: "Events" })).toBeInTheDocument();
   });
@@ -49,7 +64,7 @@ describe("routing shells", () => {
 
   it("passes WCAG A/AA on the public shell", async () => {
     const { container } = renderAt("/");
-    await screen.findByRole("heading", { name: "Home" });
+    await screen.findByRole("heading", { name: "Fresh from the community" });
     await expectNoViolations(container);
   });
 });

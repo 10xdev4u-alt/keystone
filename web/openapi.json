@@ -3985,7 +3985,9 @@
             "description": "Page of posts + next_cursor",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PostListPage"
+                }
               }
             }
           }
@@ -6207,6 +6209,100 @@
           "offset": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "PostListItem": {
+        "type": "object",
+        "description": "A single post in a list page — the feed card contract.",
+        "required": [
+          "id",
+          "author_id",
+          "kind",
+          "title",
+          "slug",
+          "visibility",
+          "view_count",
+          "comment_count",
+          "reaction_count",
+          "bookmark_count",
+          "created_at"
+        ],
+        "properties": {
+          "author_id": {
+            "type": "string"
+          },
+          "bookmark_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "comment_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reaction_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "view_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "visibility": {
+            "type": "string"
+          }
+        }
+      },
+      "PostListPage": {
+        "type": "object",
+        "description": "Keyset page of posts.",
+        "required": [
+          "posts",
+          "limit"
+        ],
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "posts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostListItem"
+            }
           }
         }
       },

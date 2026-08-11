@@ -2286,6 +2286,33 @@ export interface components {
             /** Format: int64 */
             offset?: number;
         };
+        /** @description A single post in a list page — the feed card contract. */
+        PostListItem: {
+            author_id: string;
+            /** Format: int64 */
+            bookmark_count: number;
+            /** Format: int64 */
+            comment_count: number;
+            created_at: string;
+            id: string;
+            kind: string;
+            published_at?: string | null;
+            /** Format: int64 */
+            reaction_count: number;
+            slug: string;
+            summary?: string | null;
+            title: string;
+            /** Format: int64 */
+            view_count: number;
+            visibility: string;
+        };
+        /** @description Keyset page of posts. */
+        PostListPage: {
+            /** Format: int64 */
+            limit: number;
+            next_cursor?: string | null;
+            posts: components["schemas"]["PostListItem"][];
+        };
         PostQuery: {
             /** Format: uuid */
             author?: string | null;
@@ -5805,7 +5832,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PostListPage"];
                 };
             };
         };
