@@ -380,6 +380,21 @@ pub async fn follow(
         .follow(auth_user.user_id, target)
         .await
         .map_err(map_repo_error)?;
+    // Activity feed: the followed user learns about the follow (unless they
+    // followed themselves, which the repo already rejects).
+    crate::realtime::notify(
+        &state.pool,
+        &state.realtime,
+        crate::realtime::Notify {
+            user_id: target,
+            kind: "follow",
+            actor_id: Some(auth_user.user_id),
+            entity_type: "user",
+            entity_id: Some(auth_user.user_id),
+            payload: serde_json::json!({ "follower_id": auth_user.user_id.to_string() }),
+        },
+    )
+    .await;
     Ok(StatusCode::NO_CONTENT)
 }
 

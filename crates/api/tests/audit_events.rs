@@ -71,6 +71,7 @@ async fn test_app() -> Option<(
         started_at: Instant::now(),
         auth: test_auth(),
         rate_limit: rate_limit.clone(),
+        realtime: std::sync::Arc::new(keystone_api::realtime::RealtimeHub::new()),
         oauth: None,
     });
     Some((app, pool, rate_limit))
