@@ -182,12 +182,15 @@ impl Chat {
     }
 
     pub async fn is_member(&self, conversation_id: Uuid, user_id: Uuid) -> Result<bool, RepoError> {
-        let member = sqlx::query_scalar::<_, Option<Uuid>>(
+        // `fetch_optional`, never `fetch_one` — a non-member has NO row, and
+        // `fetch_one` would surface a RowNotFound as a 500 instead of a clean
+        // "not a member" answer.
+        let member = sqlx::query_scalar::<_, Uuid>(
             "SELECT user_id FROM conversation_members WHERE conversation_id = $1 AND user_id = $2",
         )
         .bind(conversation_id)
         .bind(user_id)
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await?;
         Ok(member.is_some())
     }
@@ -278,7 +281,8 @@ impl Chat {
         .map_err(Into::into)
     }
 
-    /// Cursor-paged messages, oldest-first for a conversation.
+    /// Cursor-paged messages, newest-first (chat history pages back in time
+    /// through the `before` cursor).
     pub async fn list_messages(
         &self,
         conversation_id: Uuid,

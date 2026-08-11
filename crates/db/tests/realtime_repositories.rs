@@ -92,9 +92,56 @@ async fn notification_feed_cursor_and_gap_recovery() {
     let page = repo.list(user, None, 2).await.unwrap();
     assert_eq!(page.len(), 2);
     assert_eq!(page[0].id, ids[4]);
+    // Second page: everything older than the first page's tail (ids 3, 2, 1).
     let page2 = repo.list(user, Some(page[1].id), 10).await.unwrap();
-    assert_eq!(page2.len(), 2);
-    assert_eq!(page2[1].id, ids[1]);
+    let page2_ids: Vec<i64> = page2.iter().map(|n| n.id).collect();
+    assert_eq!(page2_ids, vec![ids[2], ids[1], ids[0]]);
+    // The pages are disjoint and exhaustive — no gaps, no overlaps.
+    let all: Vec<i64> = page.iter().chain(page2.iter()).map(|n| n.id).collect();
+    assert_eq!(all, ids.iter().rev().copied().collect::<Vec<_>>());
+}
+
+#[tokio::test]
+async fn cursor_paging_disjoint_and_exhaustive() {
+    let Some(pool) = test_pool().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let user = make_user(&pool, "paging@test.dev").await;
+    let actor = make_user(&pool, "paging-actor@test.dev").await;
+    let repo = Notifications::new(pool.clone());
+    let mut ids = Vec::new();
+    for i in 0..25 {
+        let n = repo
+            .create(&keystone_db::repositories::notifications::NewNotification {
+                user_id: user,
+                kind: "follow",
+                actor_id: Some(actor),
+                entity_type: "user",
+                entity_id: None,
+                payload: json!({ "n": i }),
+            })
+            .await
+            .unwrap();
+        ids.push(n.id);
+    }
+    // Walk pages of 10 until exhaustion; expect 3 pages: 10, 10, 5.
+    let mut got = Vec::new();
+    let mut before: Option<i64> = None;
+    loop {
+        let page = repo.list(user, before, 10).await.unwrap();
+        if page.is_empty() {
+            break;
+        }
+        before = Some(page.last().unwrap().id);
+        got.extend(page.into_iter().map(|n| n.id));
+    }
+    assert_eq!(got.len(), 25, "walking pages must exhaust the feed exactly");
+    assert_eq!(
+        got,
+        ids.iter().rev().copied().collect::<Vec<_>>(),
+        "no dupes, no gaps"
+    );
 }
 
 #[tokio::test]
@@ -264,20 +311,34 @@ async fn direct_conversation_is_unique_and_membership_gated() {
     assert!(chat.is_member(c1.id, alice).await.unwrap());
     assert!(chat.is_member(c1.id, bob).await.unwrap());
 
-    // A third user is NOT a member and cannot read/send.
+    // A third user is NOT a member and cannot read/send — and the rejection
+    // must be a clean InvalidInput (400-class), never a Database error (500).
     assert!(!chat.is_member(c1.id, eve).await.unwrap());
     let send = chat.send_message(c1.id, eve, "hi").await;
-    assert!(send.is_err(), "non-member send must fail");
+    assert!(
+        matches!(
+            send,
+            Err(keystone_db::repositories::RepoError::InvalidInput(_))
+        ),
+        "non-member send must be InvalidInput, got: {send:?}"
+    );
     let list = chat.list_messages(c1.id, eve, None, 10).await;
-    assert!(list.is_err(), "non-member read must fail");
+    assert!(
+        matches!(
+            list,
+            Err(keystone_db::repositories::RepoError::InvalidInput(_))
+        ),
+        "non-member read must be InvalidInput, got: {list:?}"
+    );
 
     // Member sends + reads work.
     chat.send_message(c1.id, alice, "hello bob").await.unwrap();
     chat.send_message(c1.id, bob, "hey alice").await.unwrap();
     let msgs = chat.list_messages(c1.id, alice, None, 10).await.unwrap();
     assert_eq!(msgs.len(), 2);
-    assert_eq!(msgs[0].body, "hello bob");
-    assert_eq!(msgs[1].body, "hey alice");
+    // Newest first — chat history pages back in time via the `before` cursor.
+    assert_eq!(msgs[0].body, "hey alice");
+    assert_eq!(msgs[1].body, "hello bob");
 }
 
 #[tokio::test]

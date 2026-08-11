@@ -225,15 +225,15 @@ async fn follow_triggers_notification_and_mark_read_flow() {
         eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
         return;
     };
-    let (alice, alice_id) = register_user(&app, "n-alice@test.dev").await;
-    let (bob, _bob_id) = register_user(&app, "n-bob@test.dev").await;
+    let (alice, _alice_id) = register_user(&app, "n-alice@test.dev").await;
+    let (bob, bob_id) = register_user(&app, "n-bob@test.dev").await;
 
     // Alice follows Bob → Bob gets a `follow` notification.
     let follow = app
         .clone()
         .oneshot(request(
-            "POST",
-            &format!("/api/v1/users/{}/follow", alice_id),
+            "PUT",
+            &format!("/api/v1/users/{bob_id}/follow"),
             Some(&alice),
             None,
         ))
@@ -417,40 +417,62 @@ async fn unauthorized_ws_join_and_presence_rejected() {
         return;
     };
     let (alice, _alice_id) = register_user(&app, "ws-a@test.dev").await;
-    let (_bob, bob_id) = register_user(&app, "ws-b@test.dev").await;
+    let (bob, bob_id) = register_user(&app, "ws-b@test.dev").await;
     let (eve, _eve_id) = register_user(&app, "ws-eve@test.dev").await;
-
     let conv = direct_conversation(&app, &alice, bob_id).await;
 
-    // Non-member WS upgrade → 403 BEFORE any socket is opened.
-    let join = app
-        .clone()
-        .oneshot(request(
-            "GET",
-            &format!("/api/v1/ws/chat/{conv}"),
-            Some(&eve),
-            None,
-        ))
+    // Real server so the handshake actually happens; the membership check must
+    // reject the non-member BEFORE any socket is opened (403, not an upgrade).
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, app).await;
+    });
+
+    let connect = |token: &str| {
+        // Build from the URI so tungstenite fills in the RFC 6455 headers
+        // itself; only the bearer token is added.
+        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+        let mut request = format!("ws://127.0.0.1:{port}/api/v1/ws/chat/{conv}")
+            .into_client_request()
+            .unwrap();
+        request
+            .headers_mut()
+            .insert("Authorization", format!("Bearer {token}").parse().unwrap());
+        request
+    };
+
+    // Non-member: the handshake itself is rejected with 403.
+    let err = tokio_tungstenite::connect_async(connect(&eve)).await;
+    match err {
+        Err(tokio_tungstenite::tungstenite::Error::Http(response)) => {
+            eprintln!("NONMEMBER_RESPONSE_BODY={:?}", response.body());
+            assert_eq!(
+                response.status(),
+                axum::http::StatusCode::FORBIDDEN,
+                "non-member handshake rejected with 403"
+            );
+        }
+        other => panic!("expected an HTTP 403 rejection, got: {other:?}"),
+    }
+
+    // Member: the same gate admits them (proves the gate is membership).
+    let (mut ws, _) = tokio_tungstenite::connect_async(connect(&bob))
         .await
-        .unwrap();
-    assert_eq!(
-        join.status(),
-        StatusCode::FORBIDDEN,
-        "non-member join rejected"
-    );
+        .expect("member joins");
+    let _ = ws.close(None).await;
 
     // Non-member presence read → 404 (existence never confirmed).
-    let presence = app
-        .clone()
-        .oneshot(request(
-            "GET",
-            &format!("/api/v1/conversations/{conv}/presence"),
-            Some(&eve),
-            None,
+    let rest = reqwest::Client::new();
+    let presence = rest
+        .get(format!(
+            "http://127.0.0.1:{port}/api/v1/conversations/{conv}/presence"
         ))
+        .header("Authorization", format!("Bearer {eve}"))
+        .send()
         .await
         .unwrap();
-    assert_eq!(presence.status(), StatusCode::NOT_FOUND);
+    assert_eq!(presence.status(), axum::http::StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
@@ -471,11 +493,15 @@ async fn ws_chat_message_flow_presence_and_notification() {
     });
 
     let connect = |token: &str| {
-        let request = http::Request::builder()
-            .uri(format!("ws://127.0.0.1:{port}/api/v1/ws/chat/{conv}"))
-            .header("Authorization", format!("Bearer {token}"))
-            .body(())
+        // Build from the URI so tungstenite fills in the RFC 6455 headers
+        // itself; only the bearer token is added.
+        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+        let mut request = format!("ws://127.0.0.1:{port}/api/v1/ws/chat/{conv}")
+            .into_client_request()
             .unwrap();
+        request
+            .headers_mut()
+            .insert("Authorization", format!("Bearer {token}").parse().unwrap());
         tokio_tungstenite::connect_async(request)
     };
 

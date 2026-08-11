@@ -261,13 +261,16 @@ pub async fn list_notifications(
         .map_err(map_repo_error)?;
     // Read flag derived from the per-user cursor in ONE query — items at or
     // below the cursor are read, so the unread count stays trivially derivable.
+    // No state row yet = cursor 0 (nothing read). `fetch_optional`, not
+    // `fetch_one` — an empty states table is normal for a fresh user.
     let cursor = sqlx::query_scalar::<_, Option<i64>>(
         "SELECT read_cursor FROM notification_states WHERE user_id = $1",
     )
     .bind(user.user_id)
-    .fetch_one(&state.pool)
+    .fetch_optional(&state.pool)
     .await
     .map_err(ApiError::Database)?
+    .flatten()
     .unwrap_or(0);
     let unread = repo
         .unread_count(user.user_id)
