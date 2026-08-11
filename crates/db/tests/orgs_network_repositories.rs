@@ -317,7 +317,10 @@ async fn salary_buckets_grow_bounds_without_identity() {
 
     // Merge five anonymized submissions into one bucket. Sub-threshold
     // buckets are NEVER readable — anonymity is enforced at the read.
-    for (i, amount) in [90_000i64, 110_000, 100_000, 95_000, 120_000].into_iter().enumerate() {
+    for (i, amount) in [90_000i64, 110_000, 100_000, 95_000, 120_000]
+        .into_iter()
+        .enumerate()
+    {
         careers
             .merge_submission(&SalarySubmission {
                 role: "Engineer".into(),
