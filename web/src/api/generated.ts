@@ -2363,6 +2363,24 @@ export interface components {
             /** Format: int64 */
             unread: number;
         };
+        /** @description Full course detail: the course plus its module tree. */
+        CourseDetailResponse: {
+            course: components["schemas"]["CourseView"];
+            modules: components["schemas"]["ModuleView"][];
+        };
+        CourseListResponse: {
+            courses: components["schemas"]["CourseView"][];
+        };
+        /** @description Course card / detail — the list contract. */
+        CourseView: {
+            author_id: string;
+            created_at: string;
+            description?: string | null;
+            id: string;
+            slug: string;
+            status: string;
+            title: string;
+        };
         CreateAnswerRequest: {
             body: string;
         };
@@ -2528,6 +2546,15 @@ export interface components {
             position: number;
             title: string;
         };
+        /** @description One lesson inside a course module. */
+        LessonView: {
+            /** Format: int32 */
+            duration_seconds?: number | null;
+            id: string;
+            /** Format: int32 */
+            position: number;
+            title: string;
+        };
         ListParams: {
             /** Format: date-time */
             before?: string | null;
@@ -2593,6 +2620,14 @@ export interface components {
             limit?: number | null;
         };
         ModuleRequest: {
+            /** Format: int32 */
+            position: number;
+            title: string;
+        };
+        /** @description One module (chapter) of a course. */
+        ModuleView: {
+            id: string;
+            lessons: components["schemas"]["LessonView"][];
             /** Format: int32 */
             position: number;
             title: string;
@@ -4387,7 +4422,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CourseListResponse"];
                 };
             };
         };
@@ -4441,7 +4476,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CourseDetailResponse"];
                 };
             };
             /** @description Course not found */

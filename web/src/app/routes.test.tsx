@@ -57,6 +57,20 @@ vi.mock("../api/hooks", () => ({
     error: new Error("stub"),
     refetch: vi.fn(),
   })),
+  useCourses: vi.fn(() => ({
+    data: { courses: [] },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+  useCourse: vi.fn(() => ({
+    data: undefined,
+    isLoading: false,
+    isError: true,
+    error: new Error("stub"),
+    refetch: vi.fn(),
+  })),
   useCommunities: vi.fn(() => ({
     data: { communities: [] },
     isLoading: false,

@@ -30,6 +30,12 @@ const MyProfileRedirect = lazy(() =>
 const EventPage = lazy(() =>
   import("../pages/EventPage").then((m) => ({ default: m.EventPage })),
 );
+const CoursesPage = lazy(() =>
+  import("../pages/CoursesPage").then((m) => ({ default: m.CoursesPage })),
+);
+const CoursePage = lazy(() =>
+  import("../pages/CoursePage").then((m) => ({ default: m.CoursePage })),
+);
 
 const HomePage = lazy(() =>
   import("../pages/HomePage").then((m) => ({ default: m.HomePage })),
@@ -122,7 +128,8 @@ export const routesConfig: RouteObject[] = [
       { path: "/orgs/:slug", element: withSuspense(<OrgPage />) },
       { path: "/search", element: withSuspense(<SearchPage />) },
       { path: "/users/:userId", element: withSuspense(<ProfilePage />) },
-      { path: "/courses", element: withSuspense(<Placeholder title="Courses" />) },
+      { path: "/courses", element: withSuspense(<CoursesPage />) },
+      { path: "/courses/:slug", element: withSuspense(<CoursePage />) },
       { path: "/login", element: withSuspense(<LoginPage />) },
       { path: "/register", element: withSuspense(<RegisterPage />) },
       { path: "/verify", element: withSuspense(<VerifyPage />) },
