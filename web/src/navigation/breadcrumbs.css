@@ -1,0 +1,28 @@
+.breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  list-style: none;
+  padding: 0;
+}
+
+.breadcrumbs__link {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.breadcrumbs__link:hover {
+  color: var(--color-link);
+}
+
+.breadcrumbs__current {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+}
+
+.breadcrumbs__sep {
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+}

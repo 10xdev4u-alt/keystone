@@ -25,6 +25,17 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
+  it("renders as a child element via asChild (link semantics)", () => {
+    render(
+      <Button asChild>
+        <a href="/posts">Browse posts</a>
+      </Button>,
+    );
+    const link = screen.getByRole("link", { name: "Browse posts" });
+    expect(link).toHaveClass("btn", "btn--primary", "btn--md");
+    expect(link).toHaveAttribute("href", "/posts");
+  });
+
   it("applies variant and size classes", () => {
     const { container } = render(
       <Button variant="danger" size="lg" className="extra">

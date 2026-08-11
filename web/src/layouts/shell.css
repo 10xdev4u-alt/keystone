@@ -1,0 +1,232 @@
+.shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Public shell ───────────────────────────────────────────────────────── */
+
+.shell__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  height: var(--header-height);
+  padding-inline: var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.shell__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+}
+
+.shell__brand:hover {
+  text-decoration: none;
+}
+
+.shell__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
+}
+
+.shell__actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.shell__link {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+}
+
+.shell__link:hover {
+  background: var(--color-surface-muted);
+  text-decoration: none;
+}
+
+.shell__link--cta {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.shell__link--cta:hover {
+  background: var(--color-primary-hover);
+}
+
+.shell__main {
+  flex: 1;
+  width: 100%;
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding: var(--space-5);
+}
+
+.shell__footer {
+  padding: var(--space-5);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* ── Shared nav ─────────────────────────────────────────────────────────── */
+
+.shell-nav ul {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.shell-nav__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.shell-nav__link:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.shell-nav__link--active {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+/* ── App + admin shells (sidebar layout) ────────────────────────────────── */
+
+.shell--app,
+.shell--admin {
+  flex-direction: row;
+}
+
+.shell__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 15rem;
+  flex-shrink: 0;
+  padding: var(--space-4);
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+}
+
+.shell__sidebar .shell-nav ul {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.shell__sidebar .shell-nav__link {
+  width: 100%;
+}
+
+.shell__sidebar-footer {
+  margin-top: auto;
+}
+
+.shell__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.shell__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  height: var(--header-height);
+  padding-inline: var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.shell__topbar-title {
+  font-weight: var(--weight-semibold);
+}
+
+.shell--admin .shell__sidebar {
+  background: var(--color-surface-muted);
+}
+
+/* Mobile: stack the public header, allow scroll for sidebar shells. */
+@media (max-width: 40rem) {
+  .shell__header {
+    flex-wrap: wrap;
+    height: auto;
+    padding-block: var(--space-2);
+    gap: var(--space-2);
+  }
+
+  .shell__header .shell-nav {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .shell--app,
+  .shell--admin {
+    flex-direction: column;
+  }
+
+  .shell__sidebar {
+    width: 100%;
+    height: auto;
+    position: static;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+  }
+
+  .shell__sidebar .shell-nav ul {
+    flex-direction: row;
+  }
+
+  .shell__sidebar .shell-nav__link {
+    width: auto;
+  }
+
+  .shell__sidebar-footer {
+    margin-top: 0;
+    margin-left: auto;
+  }
+}

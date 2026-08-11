@@ -24,6 +24,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref,
   ) => {
     const Comp = asChild ? Slot : "button";
+    const spinner = (
+      <span className="btn__spinner" aria-hidden="true" data-testid="button-spinner" />
+    );
     return (
       <Comp
         ref={ref}
@@ -33,10 +36,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         aria-busy={loading || undefined}
         {...props}
       >
-        {loading && (
-          <span className="btn__spinner" aria-hidden="true" data-testid="button-spinner" />
+        {/* Radix Slot requires EXACTLY ONE child element — siblings (like the
+            spinner) break it. asChild keeps only the slotted child; plain
+            buttons render the spinner next to the label. */}
+        {asChild ? children : (
+          <>
+            {loading && spinner}
+            {children}
+          </>
         )}
-        {children}
       </Comp>
     );
   },
