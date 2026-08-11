@@ -63,6 +63,39 @@ fn spec_exposes_content_social_qa_paths() {
         "/api/v1/posts/{id}/answers/{answer_id}/accept",
         "/api/v1/posts/{id}/bounty",
         "/api/v1/bounties/{id}/award",
+        "/api/v1/orgs",
+        "/api/v1/orgs/{slug}",
+        "/api/v1/orgs/{slug}/join",
+        "/api/v1/orgs/{slug}/leave",
+        "/api/v1/orgs/{slug}/members",
+        "/api/v1/orgs/{slug}/members/{member_id}",
+        "/api/v1/orgs/{slug}/claims",
+        "/api/v1/orgs/{slug}/claims/{claim_id}/verify",
+        "/api/v1/users/{user_id}/follow",
+        "/api/v1/users/{user_id}/connect",
+        "/api/v1/users/{user_id}/connections/accept",
+        "/api/v1/users/{user_id}/connections/reject",
+        "/api/v1/users/{user_id}/block",
+        "/api/v1/me/following",
+        "/api/v1/me/connections",
+        "/api/v1/users/{user_id}/profile",
+        "/api/v1/me/profile",
+        "/api/v1/me/education",
+        "/api/v1/me/education/{id}",
+        "/api/v1/me/experience",
+        "/api/v1/me/experience/{id}",
+        "/api/v1/me/skills",
+        "/api/v1/me/skills/{skill}",
+        "/api/v1/salaries",
+        "/api/v1/salaries/search",
+        "/api/v1/orgs/{slug}/vendors",
+        "/api/v1/orgs/{slug}/vendors/{listing_id}",
+        "/api/v1/orgs/{slug}/vendors/{listing_id}/verify",
+        "/api/v1/orgs/{slug}/alerts",
+        "/api/v1/orgs/{slug}/alerts/{alert_id}/resolve",
+        "/api/v1/career-paths",
+        "/api/v1/career-paths/{path_id}",
+        "/api/v1/me/assessments",
     ] {
         assert!(paths.contains_key(route), "missing path {route}");
     }
@@ -86,8 +119,8 @@ fn spec_tags_each_operation() {
         }
     }
     assert!(
-        tagged >= 40,
-        "expected >= 40 tagged operations, got {tagged}"
+        tagged >= 75,
+        "expected >= 75 tagged operations, got {tagged}"
     );
 }
 

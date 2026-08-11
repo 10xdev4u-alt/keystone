@@ -26,6 +26,7 @@ use keystone_db::repositories::profiles::{NewEducation, NewExperience, Profiles}
 use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::Digest;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 const NAME_MAX: usize = 100;
@@ -46,7 +47,7 @@ fn validate_text(value: &str, what: &str, max: usize) -> Result<(), ApiError> {
 
 // ── Organizations ───────────────────────────────────────────────────────────
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct CreateOrgRequest {
     pub name: String,
     pub description: Option<String>,
@@ -54,21 +55,33 @@ pub struct CreateOrgRequest {
     pub industry: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct SetRoleRequest {
     pub role: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct ClaimRequest {
     pub domain: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct VerifyClaimRequest {
     pub token: String,
 }
 
+/// Create an organization. The creator becomes the owner.
+#[utoipa::path(
+    post,
+    path = "/api/v1/orgs",
+    request_body = CreateOrgRequest,
+    responses(
+        (status = 201, description = "Organization created", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn create_org(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -104,6 +117,19 @@ pub async fn create_org(
     ))
 }
 
+/// List organizations (paged).
+#[utoipa::path(
+    get,
+    path = "/api/v1/orgs",
+    params(
+        ("limit" = Option<i64>, Query, description = "Page size"),
+        ("offset" = Option<i64>, Query, description = "Page offset"),
+    ),
+    responses(
+        (status = 200, description = "Organizations page", body = Value),
+    ),
+    tag = "network"
+)]
 pub async fn list_orgs(
     State(state): State<AppState>,
     Query(query): Query<PageQuery>,
@@ -117,6 +143,17 @@ pub async fn list_orgs(
     Ok(Json(json!({ "organizations": items })))
 }
 
+/// Fetch an organization by slug.
+#[utoipa::path(
+    get,
+    path = "/api/v1/orgs/{slug}",
+    params(("slug" = String, Path, description = "Organization slug")),
+    responses(
+        (status = 200, description = "Organization", body = Value),
+        (status = 404, description = "Organization not found"),
+    ),
+    tag = "network"
+)]
 pub async fn get_org(
     State(state): State<AppState>,
     Path(slug): Path<String>,
@@ -130,6 +167,19 @@ pub async fn get_org(
     Ok(Json(json!({ "organization": org_json(&org) })))
 }
 
+/// Join an organization.
+#[utoipa::path(
+    post,
+    path = "/api/v1/orgs/{slug}/join",
+    params(("slug" = String, Path, description = "Organization slug")),
+    responses(
+        (status = 204, description = "Joined"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 404, description = "Organization not found"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn join_org(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -156,6 +206,18 @@ pub async fn join_org(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Leave an organization.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/orgs/{slug}/leave",
+    params(("slug" = String, Path, description = "Organization slug")),
+    responses(
+        (status = 204, description = "Left"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn leave_org(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -182,6 +244,17 @@ pub async fn leave_org(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// List an organization's members.
+#[utoipa::path(
+    get,
+    path = "/api/v1/orgs/{slug}/members",
+    params(("slug" = String, Path, description = "Organization slug")),
+    responses(
+        (status = 200, description = "Members", body = Value),
+        (status = 404, description = "Organization not found"),
+    ),
+    tag = "network"
+)]
 pub async fn list_members(
     State(state): State<AppState>,
     Path(slug): Path<String>,
@@ -208,6 +281,23 @@ pub async fn list_members(
 
 /// Role changes require the org owner. Ownership transfer demotes the old
 /// owner atomically (repo-level invariant).
+/// Change an organization member's role. Org staff only.
+#[utoipa::path(
+    patch,
+    path = "/api/v1/orgs/{slug}/members/{member_id}",
+    request_body = SetRoleRequest,
+    params(
+        ("slug" = String, Path, description = "Organization slug"),
+        ("member_id" = Uuid, Path, description = "Member user id"),
+    ),
+    responses(
+        (status = 204, description = "Role updated"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Insufficient role"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn set_member_role(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -247,6 +337,20 @@ pub async fn set_member_role(
 /// File an org claim. The claimant must already be a member (prevents
 /// drive-by domain takeover attempts on orgs you have no stake in). Only
 /// the token HASH is persisted.
+/// File a domain claim on an organization. Requires a matching DNS TXT
+/// record (verification step below).
+#[utoipa::path(
+    post,
+    path = "/api/v1/orgs/{slug}/claims",
+    request_body = ClaimRequest,
+    params(("slug" = String, Path, description = "Organization slug")),
+    responses(
+        (status = 201, description = "Claim filed", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn file_claim(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -308,6 +412,22 @@ pub async fn file_claim(
 }
 
 /// Verify a claim with the token. The token is hashed before comparison.
+/// Verify a domain claim (checks the DNS TXT record).
+#[utoipa::path(
+    post,
+    path = "/api/v1/orgs/{slug}/claims/{claim_id}/verify",
+    request_body = VerifyClaimRequest,
+    params(
+        ("slug" = String, Path, description = "Organization slug"),
+        ("claim_id" = Uuid, Path, description = "Claim id"),
+    ),
+    responses(
+        (status = 200, description = "Verification result", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn verify_claim(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -370,6 +490,18 @@ pub(crate) async fn org_by_slug_or_404(
 
 // ── Social graph ────────────────────────────────────────────────────────────
 
+/// Follow a user.
+#[utoipa::path(
+    put,
+    path = "/api/v1/users/{user_id}/follow",
+    params(("user_id" = Uuid, Path, description = "Target user id")),
+    responses(
+        (status = 204, description = "Following"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn follow(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -398,6 +530,18 @@ pub async fn follow(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Unfollow a user.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/users/{user_id}/follow",
+    params(("user_id" = Uuid, Path, description = "Target user id")),
+    responses(
+        (status = 204, description = "Unfollowed"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn unfollow(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -411,6 +555,18 @@ pub async fn unfollow(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Send a connection request.
+#[utoipa::path(
+    put,
+    path = "/api/v1/users/{user_id}/connect",
+    params(("user_id" = Uuid, Path, description = "Target user id")),
+    responses(
+        (status = 204, description = "Request sent"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn connect(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -424,6 +580,18 @@ pub async fn connect(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Cancel a pending connection request.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/users/{user_id}/connect",
+    params(("user_id" = Uuid, Path, description = "Target user id")),
+    responses(
+        (status = 204, description = "Request cancelled"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn cancel_connect(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -438,6 +606,18 @@ pub async fn cancel_connect(
 }
 
 /// The TARGET accepts the requester's pending connection.
+/// Accept a connection request.
+#[utoipa::path(
+    post,
+    path = "/api/v1/users/{user_id}/connections/accept",
+    params(("user_id" = Uuid, Path, description = "Requester user id")),
+    responses(
+        (status = 204, description = "Connected"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn accept_connection(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -456,6 +636,18 @@ pub async fn accept_connection(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Reject a connection request.
+#[utoipa::path(
+    post,
+    path = "/api/v1/users/{user_id}/connections/reject",
+    params(("user_id" = Uuid, Path, description = "Requester user id")),
+    responses(
+        (status = 204, description = "Request rejected"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn reject_connection(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -474,6 +666,18 @@ pub async fn reject_connection(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Block a user. Blocks hide profiles and mute interactions both ways.
+#[utoipa::path(
+    put,
+    path = "/api/v1/users/{user_id}/block",
+    params(("user_id" = Uuid, Path, description = "Target user id")),
+    responses(
+        (status = 204, description = "Blocked"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn block(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -496,6 +700,18 @@ pub async fn block(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Unblock a user.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/users/{user_id}/block",
+    params(("user_id" = Uuid, Path, description = "Target user id")),
+    responses(
+        (status = 204, description = "Unblocked"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn unblock(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -509,6 +725,17 @@ pub async fn unblock(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Users the caller follows.
+#[utoipa::path(
+    get,
+    path = "/api/v1/me/following",
+    responses(
+        (status = 200, description = "Following list", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn my_following(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -523,6 +750,17 @@ pub async fn my_following(
     })))
 }
 
+/// The caller's accepted connections.
+#[utoipa::path(
+    get,
+    path = "/api/v1/me/connections",
+    responses(
+        (status = 200, description = "Connections list", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn my_connections(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -578,13 +816,25 @@ async fn profile_visible(
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct SetProfileRequest {
     pub bio: Option<String>,
     pub location: Option<String>,
     pub visibility: Option<String>,
 }
 
+/// Update the caller's own profile.
+#[utoipa::path(
+    put,
+    path = "/api/v1/me/profile",
+    request_body = SetProfileRequest,
+    responses(
+        (status = 200, description = "Updated profile", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn set_profile(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -614,6 +864,18 @@ pub async fn set_profile(
     })))
 }
 
+/// Fetch a profile. Visibility matrix: public → everyone, connections only,
+/// private → self; blocks hide the profile entirely (404).
+#[utoipa::path(
+    get,
+    path = "/api/v1/users/{user_id}/profile",
+    params(("user_id" = Uuid, Path, description = "User id")),
+    responses(
+        (status = 200, description = "Profile", body = Value),
+        (status = 404, description = "Profile not found or hidden"),
+    ),
+    tag = "network"
+)]
 pub async fn get_profile(
     State(state): State<AppState>,
     maybe: MaybeUser,
@@ -664,7 +926,7 @@ pub async fn get_profile(
     })))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct EducationRequest {
     pub school: String,
     pub degree: Option<String>,
@@ -674,7 +936,7 @@ pub struct EducationRequest {
     pub description: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct ExperienceRequest {
     pub title: String,
     pub company: Option<String>,
@@ -685,12 +947,24 @@ pub struct ExperienceRequest {
     pub description: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct SkillRequest {
     pub skill: String,
     pub level: String,
 }
 
+/// Add an education entry to the caller's profile.
+#[utoipa::path(
+    post,
+    path = "/api/v1/me/education",
+    request_body = EducationRequest,
+    responses(
+        (status = 201, description = "Entry added", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn add_education(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -718,6 +992,18 @@ pub async fn add_education(
     ))
 }
 
+/// Remove an education entry. Owner only.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/me/education/{id}",
+    params(("id" = Uuid, Path, description = "Entry id")),
+    responses(
+        (status = 204, description = "Entry removed"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn remove_education(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -734,6 +1020,18 @@ pub async fn remove_education(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Add a work experience entry to the caller's profile.
+#[utoipa::path(
+    post,
+    path = "/api/v1/me/experience",
+    request_body = ExperienceRequest,
+    responses(
+        (status = 201, description = "Entry added", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn add_experience(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -762,6 +1060,18 @@ pub async fn add_experience(
     ))
 }
 
+/// Remove a work experience entry. Owner only.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/me/experience/{id}",
+    params(("id" = Uuid, Path, description = "Entry id")),
+    responses(
+        (status = 204, description = "Entry removed"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn remove_experience(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -778,6 +1088,18 @@ pub async fn remove_experience(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Add a skill to the caller's profile.
+#[utoipa::path(
+    put,
+    path = "/api/v1/me/skills",
+    request_body = SkillRequest,
+    responses(
+        (status = 204, description = "Skill added"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn add_skill(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -792,6 +1114,18 @@ pub async fn add_skill(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Remove a skill. Owner only.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/me/skills/{skill}",
+    params(("skill" = String, Path, description = "Skill name")),
+    responses(
+        (status = 204, description = "Skill removed"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "network"
+)]
 pub async fn remove_skill(
     State(state): State<AppState>,
     auth_user: AuthUser,
