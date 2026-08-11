@@ -1055,7 +1055,7 @@ async fn cover_art_round_trips_through_create_update_read() {
 
     // Read by slug and by id both expose it.
     for uri in [
-        format!("/api/v1/posts/covered-api"),
+        "/api/v1/posts/covered-api".to_string(),
         format!("/api/v1/posts/{id}"),
     ] {
         let read = app

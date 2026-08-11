@@ -85,6 +85,10 @@ pub(crate) fn slugify(title: &str) -> String {
 
 /// Build a unique slug: slugify the title, or fall back to a short random id,
 /// then retry with `-2`, `-3`, … on collision until the DB accepts it.
+/// Retry loop that also owns slug generation — the many arguments mirror the
+/// `CreatePostRequest` fields it funnels into `NewPost`; bundling them would
+/// just smuggle the request struct in and couple this to its serde shape.
+#[allow(clippy::too_many_arguments)]
 async fn unique_slug(
     posts: &Posts,
     author_id: Uuid,
