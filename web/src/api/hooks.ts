@@ -16,7 +16,7 @@ import type { components, operations } from "./generated";
 
 type TokenResponse = components["schemas"]["TokenResponse"];
 type UserView = components["schemas"]["UserView"];
-type RegisterRequest = components["schemas"]["RegisterRequest"];
+type RegisterRequest = components["schemas"]["SignupRequest"];
 type LoginRequest = components["schemas"]["LoginRequest"];
 
 // ── Auth ────────────────────────────────────────────────────────────────────
@@ -79,6 +79,20 @@ export function useRegister(
       qc.setQueryData(["auth", "me"], data.user);
       userOnSuccess?.(data, vars, ctx, mutation);
     },
+  });
+}
+
+export function useVerifyEmail(
+  options?: UseMutationOptions<void, ApiRequestError, { token: string }>,
+) {
+  return useMutation({
+    mutationFn: async ({ token }) => {
+      const { error } = await client.POST("/api/v1/auth/verify-email", {
+        body: { token },
+      });
+      if (error) throw error;
+    },
+    ...options,
   });
 }
 
