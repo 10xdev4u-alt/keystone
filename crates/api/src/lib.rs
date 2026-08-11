@@ -83,13 +83,16 @@ pub fn router(state: AppState) -> Router {
         // their own sub-router so it never wraps credential-based routes
         // (register/login have no CSRF pair yet). The guard is strict: any
         // state-changing request must present a matching cookie + header.
+        // Cookie-authenticated session routes: CSRF-guarded and on the
+        // generous Session tier (the SPA refreshes on every page load — a
+        // strict per-IP tier would 429 normal navigation).
         .merge(
             Router::new()
                 .route("/api/v1/auth/refresh", post(auth::refresh))
                 .route("/api/v1/auth/logout", post(auth::logout))
                 .route_layer(axum_mw::from_fn_with_state(
                     state.clone(),
-                    middleware::rate_limit_auth,
+                    middleware::rate_limit_session,
                 ))
                 .route_layer(axum_mw::from_fn(csrf::csrf_guard)),
         )
