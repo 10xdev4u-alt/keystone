@@ -24,15 +24,9 @@ function ProfileTab() {
   const [visibility, setVisibility] = useState("public");
   const [loaded, setLoaded] = useState(false);
 
-  if (!me) {
-    return <ErrorState title="Sign in required" message="Sign in to edit your profile." />;
-  }
-  if (isLoading) return <Spinner label="Loading profile" />;
-  if (isError || !data) {
-    return <ErrorState title="Profile unavailable" message={error instanceof Error ? error.message : "Try again."} />;
-  }
-
-  // Hydrate the form once the profile arrives (keeps typing state while saving).
+  // Hydrate the form once the profile arrives (keeps typing state while
+  // saving). Runs unconditionally — hooks must not sit behind conditionals;
+  // the data guard keeps it a no-op until the profile exists.
   useEffect(() => {
     if (!loaded && data) {
       setBio(data.profile.bio ?? "");
@@ -41,6 +35,14 @@ function ProfileTab() {
       setLoaded(true);
     }
   }, [data, loaded]);
+
+  if (!me) {
+    return <ErrorState title="Sign in required" message="Sign in to edit your profile." />;
+  }
+  if (isLoading) return <Spinner label="Loading profile" />;
+  if (isError || !data) {
+    return <ErrorState title="Profile unavailable" message={error instanceof Error ? error.message : "Try again."} />;
+  }
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
