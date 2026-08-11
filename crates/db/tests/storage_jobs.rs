@@ -7,7 +7,7 @@
 //!
 //! Self-skips when TEST_DATABASE_URL is unset.
 
-use keystone_db::jobs::run_exclusive;
+use keystone_db::jobs::run_exclusive_on;
 use keystone_db::repositories::files::{Files, NewFileRecord};
 use keystone_db::repositories::users::{NewUser, Users};
 use keystone_db::storage::{make_thumbnail, MemoryStorage, StorageBackend};
@@ -160,13 +160,23 @@ async fn advisory_lock_guarantees_single_runner() {
         return;
     };
     let counter = Arc::new(AtomicUsize::new(0));
+    // Pool connections are opened serially (~30ms each), so racers must
+    // synchronize AFTER acquiring: without a barrier, later racers would
+    // attempt the lock after the first winner already released — a sequential
+    // stampede that is NOT the concurrency this test must prove.
+    let barrier = Arc::new(tokio::sync::Barrier::new(8));
     let ran: Vec<bool> = {
         let mut handles = Vec::new();
         for _ in 0..8 {
             let pool = pool.clone();
             let counter = counter.clone();
+            let barrier = barrier.clone();
             handles.push(tokio::spawn(async move {
-                run_exclusive(&pool, "stats-aggregate", async move {
+                let mut conn = pool.acquire().await.unwrap();
+                // All 8 sessions are live now — release them together so the
+                // lock attempts genuinely overlap.
+                barrier.wait().await;
+                run_exclusive_on(&mut conn, "stats-aggregate", async move {
                     // Slow enough that racers pile up behind the lock.
                     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                     counter.fetch_add(1, Ordering::SeqCst);
@@ -197,12 +207,18 @@ async fn different_jobs_run_concurrently() {
     };
     let a = Arc::new(AtomicUsize::new(0));
     let b = Arc::new(AtomicUsize::new(0));
+    // Same connection-opening serialization as above: sync after acquire so
+    // all 8 lock attempts overlap instead of stampeding through the pool.
+    let barrier = Arc::new(tokio::sync::Barrier::new(8));
     let mut handles = Vec::new();
     for _ in 0..4 {
         let pool_a = pool.clone();
         let a = a.clone();
+        let barrier_a = barrier.clone();
         handles.push(tokio::spawn(async move {
-            run_exclusive(&pool_a, "job-a", async move {
+            let mut conn = pool_a.acquire().await.unwrap();
+            barrier_a.wait().await;
+            run_exclusive_on(&mut conn, "job-a", async move {
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 a.fetch_add(1, Ordering::SeqCst);
             })
@@ -211,8 +227,11 @@ async fn different_jobs_run_concurrently() {
         }));
         let pool_b = pool.clone();
         let b = b.clone();
+        let barrier_b = barrier.clone();
         handles.push(tokio::spawn(async move {
-            run_exclusive(&pool_b, "job-b", async move {
+            let mut conn = pool_b.acquire().await.unwrap();
+            barrier_b.wait().await;
+            run_exclusive_on(&mut conn, "job-b", async move {
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 b.fetch_add(1, Ordering::SeqCst);
             })
