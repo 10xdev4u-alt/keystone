@@ -10,7 +10,7 @@
 //! Jobs are plain async functions; the registry in the API layer maps names
 //! to work (stats aggregation, digests, session cleanup, ...).
 
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 use std::future::Future;
 
 /// Run `work` under the job's advisory lock. Returns `true` when THIS caller
@@ -20,14 +20,28 @@ pub async fn run_exclusive<F, T>(pool: &PgPool, job: &str, work: F) -> Result<bo
 where
     F: Future<Output = T>,
 {
-    // The lock key is a stable 64-bit hash of the job name.
-    let key: i64 = stable_job_key(job);
-
     // CRITICAL: hold a dedicated connection for the whole run. Advisory locks
     // are session-scoped and re-entrant per session — if the connection were
     // returned to the pool after the acquire query, every later runner handed
     // that same session would also "acquire" the lock.
     let mut conn = pool.acquire().await?;
+    run_exclusive_on(&mut conn, job, work).await
+}
+
+/// Like [`run_exclusive`] but on an already-acquired connection. Exposed so
+/// tests can synchronize racers AFTER connection acquisition — pool
+/// connections open serially (~30ms each), which would otherwise stagger the
+/// racers and turn a concurrency test into a sequential stampede.
+pub async fn run_exclusive_on<F, T>(
+    conn: &mut PgConnection,
+    job: &str,
+    work: F,
+) -> Result<bool, sqlx::Error>
+where
+    F: Future<Output = T>,
+{
+    // The lock key is a stable 64-bit hash of the job name.
+    let key: i64 = stable_job_key(job);
 
     // `pg_try_advisory_lock` fails fast instead of queueing — the whole point
     // of a distributed mutex for cron-like jobs.
