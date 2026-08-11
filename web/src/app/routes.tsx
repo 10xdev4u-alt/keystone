@@ -16,6 +16,16 @@ const Placeholder = lazy(() =>
   })),
 );
 
+const LoginPage = lazy(() =>
+  import("../pages/auth/LoginPage").then((m) => ({ default: m.LoginPage })),
+);
+const RegisterPage = lazy(() =>
+  import("../pages/auth/RegisterPage").then((m) => ({ default: m.RegisterPage })),
+);
+const VerifyPage = lazy(() =>
+  import("../pages/auth/VerifyPage").then((m) => ({ default: m.VerifyPage })),
+);
+
 function withSuspense(node: ReactNode): ReactNode {
   return (
     <Suspense
@@ -49,8 +59,9 @@ export const routesConfig: RouteObject[] = [
       { path: "/orgs/:slug", element: withSuspense(<Placeholder title="Organization" />) },
       { path: "/search", element: withSuspense(<Placeholder title="Search" />) },
       { path: "/courses", element: withSuspense(<Placeholder title="Courses" />) },
-      { path: "/login", element: withSuspense(<Placeholder title="Sign in" />) },
-      { path: "/register", element: withSuspense(<Placeholder title="Join Keystone" />) },
+      { path: "/login", element: withSuspense(<LoginPage />) },
+      { path: "/register", element: withSuspense(<RegisterPage />) },
+      { path: "/verify", element: withSuspense(<VerifyPage />) },
       { path: "*", element: <NotFound /> },
     ],
   },
