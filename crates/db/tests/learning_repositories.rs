@@ -5,7 +5,7 @@
 //!
 //! Self-skips when TEST_DATABASE_URL is unset.
 
-use keystone_db::repositories::assessments::{AnswerInput, Assessments, GradingKey};
+use keystone_db::repositories::assessments::{AnswerInput, Assessments};
 use keystone_db::repositories::credits::Credits;
 use keystone_db::repositories::events::{Events, NewEvent};
 use keystone_db::repositories::learning::{Learning, NewCourse};
@@ -267,33 +267,22 @@ async fn assessments_cap_attempts_and_grade_fairly() {
     let author = make_user(&pool, "assess-author@example.com").await;
     let student = make_user(&pool, "assess-student@example.com").await;
     let (course_id, _, _) = make_course(&pool, author, "assessed-course").await;
-    let assessments = Assessments::new(pool.clone());
-
-    let assessment = assessments
+    let assessments = Assessments::new(pool.clone());    let assessment = assessments
         .create_assessment(course_id, "Rust basics", 50, Some(300))
         .await
         .unwrap();
+    // The grading key is stored SERVER-SIDE — students never see or supply it.
     let q1 = assessments
-        .add_question(assessment.id, 0, "1+1?")
+        .add_question(assessment.id, 0, "1+1?", Some("2"))
         .await
         .unwrap();
     let q2 = assessments
-        .add_question(assessment.id, 1, "capital of France?")
+        .add_question(assessment.id, 1, "capital of France?", Some("paris"))
         .await
         .unwrap();
-    let key = vec![
-        GradingKey {
-            question_id: q1.id,
-            correct_response: "2".into(),
-        },
-        GradingKey {
-            question_id: q2.id,
-            correct_response: "paris".into(),
-        },
-    ];
+    assert_eq!(assessments.questions(assessment.id).await.unwrap().len(), 2);
 
-    // Fail the first attempt (50% < 50 threshold? 1/2 = 50 → pass).
-    // Half-correct gives exactly 50 — passes. Try one wrong to fail.
+    // Half-correct = 50 → meets the 50 threshold.
     let attempt = assessments
         .start_attempt(assessment.id, student)
         .await
@@ -306,7 +295,6 @@ async fn assessments_cap_attempts_and_grade_fairly() {
                 question_id: q1.id,
                 response: "2".into(),
             }],
-            &key,
         )
         .await
         .unwrap();
@@ -315,7 +303,7 @@ async fn assessments_cap_attempts_and_grade_fairly() {
 
     // Re-submitting the same attempt is refused.
     assert!(assessments
-        .submit_attempt(attempt.id, student, &[], &key)
+        .submit_attempt(attempt.id, student, &[])
         .await
         .is_err());
 
@@ -338,7 +326,6 @@ async fn assessments_cap_attempts_and_grade_fairly() {
                     response: "paris".into(),
                 },
             ],
-            &key,
         )
         .await
         .unwrap();
@@ -354,22 +341,11 @@ async fn assessments_cap_attempts_and_grade_fairly() {
                 question_id: q1.id,
                 response: "1".into(),
             }],
-            &key,
         )
         .await
         .unwrap();
-    assert!(assessments
-        .start_attempt(assessment.id, student)
-        .await
-        .is_err());
-    assert_eq!(
-        assessments
-            .attempts_for(student, assessment.id)
-            .await
-            .unwrap()
-            .len(),
-        3
-    );
+    assert!(assessments.start_attempt(assessment.id, student).await.is_err());
+    assert_eq!(assessments.attempts_for(student, assessment.id).await.unwrap().len(), 3);
 
     // A wrong-only answer grades 0 → fails.
     let fresh = make_user(&pool, "assess-student2@example.com").await;
@@ -385,7 +361,6 @@ async fn assessments_cap_attempts_and_grade_fairly() {
                 question_id: q1.id,
                 response: "99".into(),
             }],
-            &key,
         )
         .await
         .unwrap();

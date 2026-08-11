@@ -48,19 +48,12 @@ pub struct Attempt {
     pub passed: Option<bool>,
 }
 
-/// One graded answer — `correct` is computed at submit time by the repo.
+/// One graded answer — `correct` is computed at submit time by the repo
+/// against the server-side key.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnswerInput {
     pub question_id: Uuid,
     pub response: String,
-}
-
-/// The grading key for an assessment: question id → correct response.
-/// v1 stores expected responses as plain text; a future PR may hash them.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GradingKey {
-    pub question_id: Uuid,
-    pub correct_response: String,
 }
 
 #[derive(Debug, Clone)]
@@ -106,17 +99,19 @@ impl Assessments {
         assessment_id: Uuid,
         position: i32,
         prompt: &str,
+        correct_response: Option<&str>,
     ) -> Result<Question, RepoError> {
         let question = sqlx::query_as::<_, Question>(
             r#"
-            INSERT INTO assessment_questions (assessment_id, position, prompt)
-            VALUES ($1, $2, $3)
+            INSERT INTO assessment_questions (assessment_id, position, prompt, correct_response)
+            VALUES ($1, $2, $3, $4)
             RETURNING id, assessment_id, position, prompt
             "#,
         )
         .bind(assessment_id)
         .bind(position)
         .bind(prompt)
+        .bind(correct_response)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| match e {
@@ -193,16 +188,15 @@ impl Assessments {
         Ok(attempt)
     }
 
-    /// Submit an attempt: grade answers against the key inside the submit
-    /// transaction, enforce the time limit, write score + passed. A late
-    /// submission is still graded (against answers recorded so far) but
-    /// cannot change the attempt's time-limit cutoff.
+    /// Submit an attempt: grade answers against the SERVER-SIDE key inside
+    /// the submit transaction, enforce the time limit, write score + passed.
+    /// The grading key is read from `assessment_questions.correct_response`
+    /// — callers never supply it, so students cannot grade themselves.
     pub async fn submit_attempt(
         &self,
         attempt_id: Uuid,
         user_id: Uuid,
         answers: &[AnswerInput],
-        grading_key: &[GradingKey],
     ) -> Result<Attempt, RepoError> {
         let mut tx = self.pool.begin().await?;
         let attempt = sqlx::query_as::<_, Attempt>(
@@ -257,32 +251,25 @@ impl Assessments {
             return Err(RepoError::InvalidInput(
                 "assessment has no questions".into(),
             ));
-        }
+        }        // Server-side key: the expected response lives on the question row.
+        let keys: Vec<(Uuid, String)> = sqlx::query_as(
+            r#"
+            SELECT id, correct_response FROM assessment_questions
+            WHERE assessment_id = $1 AND correct_response IS NOT NULL
+            "#,
+        )
+        .bind(attempt.assessment_id)
+        .fetch_all(&mut *tx)
+        .await?;
 
         let mut correct_count = 0i64;
         for answer in answers {
-            let Some(key) = grading_key
-                .iter()
-                .find(|k| k.question_id == answer.question_id)
+            let Some((_, expected)) =
+                keys.iter().find(|(qid, _)| *qid == answer.question_id)
             else {
-                continue; // not in the key — never counted
+                continue; // unknown or unscored question — never counted
             };
-            let belongs: bool = sqlx::query_scalar(
-                r#"
-                SELECT EXISTS (
-                    SELECT 1 FROM assessment_questions
-                    WHERE id = $1 AND assessment_id = $2
-                )
-                "#,
-            )
-            .bind(answer.question_id)
-            .bind(attempt.assessment_id)
-            .fetch_one(&mut *tx)
-            .await?;
-            if !belongs {
-                continue;
-            }
-            let is_correct = answer.response.trim() == key.correct_response.trim();
+            let is_correct = answer.response.trim() == expected.trim();
             if is_correct {
                 correct_count += 1;
             }

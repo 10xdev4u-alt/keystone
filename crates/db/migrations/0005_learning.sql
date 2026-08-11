@@ -108,10 +108,14 @@ CREATE TABLE assessments (
 );
 
 CREATE TABLE assessment_questions (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    assessment_id UUID NOT NULL REFERENCES assessments (id) ON DELETE CASCADE,
-    position      INTEGER NOT NULL CHECK (position >= 0),
-    prompt        TEXT NOT NULL,
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    assessment_id    UUID NOT NULL REFERENCES assessments (id) ON DELETE CASCADE,
+    position         INTEGER NOT NULL CHECK (position >= 0),
+    prompt           TEXT NOT NULL,
+    -- The grading key lives HERE, never client-supplied: scoring fetches it
+    -- server-side. NULL = unscored (essay-style) question. Public question
+    -- reads must NOT select this column.
+    correct_response TEXT,
     UNIQUE (assessment_id, position)
 );
 
