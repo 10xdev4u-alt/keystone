@@ -53,7 +53,7 @@ fn test_auth() -> AuthServices {
 }
 
 async fn test_app() -> Option<axum::Router> {
-    let pool = keystone_db::test_util::test_pool().await?;
+    let pool = keystone_db::test_util::test_pool_isolated().await?;
     keystone_db::test_util::setup(&pool)
         .await
         .expect("db setup");
@@ -400,4 +400,120 @@ async fn register_validates_inputs() {
             "expected 400 for email={email:?} password={password:?}"
         );
     }
+}
+
+#[tokio::test]
+async fn password_reset_flow_replaces_hash_and_burns_token() {
+    let Some(app) = test_app().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+
+    // Register + verify.
+    let reg = app
+        .clone()
+        .oneshot(post_json(
+            "/api/v1/auth/register",
+            serde_json::json!({
+                "email": "reset@example.com",
+                "password": "correct-horse-battery-staple",
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(reg.status(), StatusCode::CREATED);
+    let reg_body = json_body(reg).await;
+    let verify_token = reg_body["verification_token"].as_str().unwrap();
+    app.clone()
+        .oneshot(post_json(
+            "/api/v1/auth/verify-email",
+            serde_json::json!({ "token": verify_token }),
+        ))
+        .await
+        .unwrap();
+
+    // Forgot-password returns a (dev) reset token for a known account.
+    let forgot = app
+        .clone()
+        .oneshot(post_json(
+            "/api/v1/auth/forgot-password",
+            serde_json::json!({ "email": "reset@example.com" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(forgot.status(), StatusCode::OK);
+    let forgot_body = json_body(forgot).await;
+    let reset_token = forgot_body["reset_token"]
+        .as_str()
+        .expect("dev reset token present");
+
+    // Unknown address returns generic ok with no token (no enumeration).
+    let unknown = app
+        .clone()
+        .oneshot(post_json(
+            "/api/v1/auth/forgot-password",
+            serde_json::json!({ "email": "nobody@example.com" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(unknown.status(), StatusCode::OK);
+    let unknown_body = json_body(unknown).await;
+    assert!(unknown_body.get("reset_token").is_none());
+
+    // Reset with the token + new password.
+    let reset = app
+        .clone()
+        .oneshot(post_json(
+            "/api/v1/auth/reset-password",
+            serde_json::json!({
+                "email": "reset@example.com",
+                "token": reset_token,
+                "new_password": "brand-new-password-123",
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(reset.status(), StatusCode::OK);
+
+    // Old password no longer works; new one does.
+    let old_login = app
+        .clone()
+        .oneshot(post_json(
+            "/api/v1/auth/login",
+            serde_json::json!({
+                "email": "reset@example.com",
+                "password": "correct-horse-battery-staple",
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(old_login.status(), StatusCode::UNAUTHORIZED);
+
+    let new_login = app
+        .clone()
+        .oneshot(post_json(
+            "/api/v1/auth/login",
+            serde_json::json!({
+                "email": "reset@example.com",
+                "password": "brand-new-password-123",
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(new_login.status(), StatusCode::OK);
+
+    // Token is single-use — replay is rejected.
+    let replay = app
+        .clone()
+        .oneshot(post_json(
+            "/api/v1/auth/reset-password",
+            serde_json::json!({
+                "email": "reset@example.com",
+                "token": reset_token,
+                "new_password": "another-password-456",
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(replay.status(), StatusCode::BAD_REQUEST);
 }

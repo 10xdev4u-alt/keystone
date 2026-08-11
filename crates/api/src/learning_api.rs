@@ -1175,21 +1175,21 @@ pub async fn create_event(
         ("offset" = Option<i64>, Query, description = "Page offset"),
     ),
     responses(
-        (status = 200, description = "Events page", body = Value),
+        (status = 200, description = "Events page", body = EventList),
     ),
     tag = "learning"
 )]
 pub async fn list_events(
     State(state): State<AppState>,
     Query(query): Query<PageQuery>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<EventList>> {
     let events = Events::new(state.pool.clone());
     let rows = events
         .published_events(query.limit.clamp(1, 50), query.offset.max(0))
         .await
         .map_err(map_repo_error)?;
-    let items: Vec<Value> = rows.iter().map(event_json).collect();
-    Ok(Json(json!({ "events": items })))
+    let items: Vec<EventView> = rows.iter().map(event_json).collect();
+    Ok(Json(EventList { events: items }))
 }
 
 /// Fetch an event by slug with capacity and waitlist state.
@@ -1338,17 +1338,41 @@ fn course_json(course: &keystone_db::repositories::learning::Course) -> Value {
     })
 }
 
-fn event_json(event: &keystone_db::repositories::events::Event) -> Value {
-    json!({
-        "id": event.id.to_string(),
-        "organizer_id": event.organizer_id.to_string(),
-        "title": event.title,
-        "slug": event.slug,
-        "description": event.description,
-        "starts_at": event.starts_at,
-        "ends_at": event.ends_at,
-        "capacity": event.capacity,
-        "location": event.location,
-        "status": event.status,
-    })
+/// Event card — the list contract.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct EventView {
+    pub id: String,
+    pub organizer_id: String,
+    pub title: String,
+    pub slug: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub starts_at: String,
+    pub ends_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capacity: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
+    pub status: String,
+}
+
+/// Paged events response.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct EventList {
+    pub events: Vec<EventView>,
+}
+
+fn event_json(event: &keystone_db::repositories::events::Event) -> EventView {
+    EventView {
+        id: event.id.to_string(),
+        organizer_id: event.organizer_id.to_string(),
+        title: event.title.clone(),
+        slug: event.slug.clone(),
+        description: event.description.clone(),
+        starts_at: event.starts_at.to_rfc3339(),
+        ends_at: event.ends_at.to_rfc3339(),
+        capacity: event.capacity,
+        location: event.location.clone(),
+        status: event.status.clone(),
+    }
 }

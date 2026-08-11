@@ -25,6 +25,7 @@ pub mod openapi;
 pub mod qa;
 pub mod rbac;
 pub mod realtime;
+pub mod search_api;
 pub mod social;
 
 use axum::extract::State;
@@ -70,6 +71,8 @@ pub fn router(state: AppState) -> Router {
         .merge(SwaggerUi::new("/swagger").url("/openapi.json", openapi::ApiDoc::openapi()))
         .route("/api/v1/auth/register", post(auth::register))
         .route("/api/v1/auth/verify-email", post(auth::verify_email))
+        .route("/api/v1/auth/forgot-password", post(auth::forgot_password))
+        .route("/api/v1/auth/reset-password", post(auth::reset_password))
         .route("/api/v1/auth/login", post(auth::login))
         .route_layer(axum_mw::from_fn_with_state(
             state.clone(),
@@ -109,6 +112,7 @@ pub fn router(state: AppState) -> Router {
                 .patch(content::update_post)
                 .delete(content::delete_post),
         )
+        .route("/api/v1/posts/{id}/related", get(content::get_related))
         .route("/api/v1/posts/{id}/versions", get(content::post_versions))
         .route("/api/v1/posts/{id}/view", post(content::record_view))
         .route(
@@ -200,6 +204,7 @@ pub fn router(state: AppState) -> Router {
             get(network::list_orgs).post(network::create_org),
         )
         .route("/api/v1/orgs/{slug}", get(network::get_org))
+        .route("/api/v1/search", get(search_api::search))
         .route("/api/v1/orgs/{slug}/join", post(network::join_org))
         .route(
             "/api/v1/orgs/{slug}/leave",

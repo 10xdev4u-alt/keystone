@@ -23,7 +23,7 @@ use chrono::{Duration, Utc};
 use keystone_db::repositories::links::UserLinks;
 use keystone_db::repositories::organizations::{NewOrganization, Organizations};
 use keystone_db::repositories::profiles::{NewEducation, NewExperience, Profiles};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::Digest;
 use utoipa::ToSchema;
@@ -126,21 +126,23 @@ pub async fn create_org(
         ("offset" = Option<i64>, Query, description = "Page offset"),
     ),
     responses(
-        (status = 200, description = "Organizations page", body = Value),
+        (status = 200, description = "Organizations page", body = OrgList),
     ),
     tag = "network"
 )]
 pub async fn list_orgs(
     State(state): State<AppState>,
     Query(query): Query<PageQuery>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<OrgList>> {
     let orgs = Organizations::new(state.pool.clone());
     let rows = orgs
         .list(query.limit.clamp(1, 50), query.offset.max(0))
         .await
         .map_err(map_repo_error)?;
-    let items: Vec<Value> = rows.iter().map(org_json).collect();
-    Ok(Json(json!({ "organizations": items })))
+    let items: Vec<OrgView> = rows.iter().map(org_json).collect();
+    Ok(Json(OrgList {
+        organizations: items,
+    }))
 }
 
 /// Fetch an organization by slug.
@@ -149,7 +151,7 @@ pub async fn list_orgs(
     path = "/api/v1/orgs/{slug}",
     params(("slug" = String, Path, description = "Organization slug")),
     responses(
-        (status = 200, description = "Organization", body = Value),
+        (status = 200, description = "Organization", body = OrgDetailResponse),
         (status = 404, description = "Organization not found"),
     ),
     tag = "network"
@@ -157,14 +159,16 @@ pub async fn list_orgs(
 pub async fn get_org(
     State(state): State<AppState>,
     Path(slug): Path<String>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<OrgDetailResponse>> {
     let orgs = Organizations::new(state.pool.clone());
     let org = orgs
         .get_by_slug(&slug)
         .await
         .map_err(map_repo_error)?
         .ok_or(ApiError::NotFound)?;
-    Ok(Json(json!({ "organization": org_json(&org) })))
+    Ok(Json(OrgDetailResponse {
+        organization: org_json(&org),
+    }))
 }
 
 /// Join an organization.
@@ -464,17 +468,45 @@ pub async fn verify_claim(
     Ok(Json(json!({ "status": "approved" })))
 }
 
-fn org_json(org: &keystone_db::repositories::organizations::Organization) -> Value {
-    json!({
-        "id": org.id.to_string(),
-        "name": org.name,
-        "slug": org.slug,
-        "description": org.description,
-        "website": org.website,
-        "industry": org.industry,
-        "created_by": org.created_by.to_string(),
-        "created_at": org.created_at,
-    })
+/// Organization card — the list and detail contract.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct OrgView {
+    pub id: String,
+    pub name: String,
+    pub slug: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub website: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub industry: Option<String>,
+    pub created_by: String,
+    pub created_at: String,
+}
+
+/// Paged organizations response.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct OrgList {
+    pub organizations: Vec<OrgView>,
+}
+
+/// Single-organization detail response.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct OrgDetailResponse {
+    pub organization: OrgView,
+}
+
+fn org_json(org: &keystone_db::repositories::organizations::Organization) -> OrgView {
+    OrgView {
+        id: org.id.to_string(),
+        name: org.name.clone(),
+        slug: org.slug.clone(),
+        description: org.description.clone(),
+        website: org.website.clone(),
+        industry: org.industry.clone(),
+        created_by: org.created_by.to_string(),
+        created_at: org.created_at.to_rfc3339(),
+    }
 }
 
 /// Shared guard: fetch a live org by slug or 404. Used by network and
@@ -825,13 +857,58 @@ pub struct SetProfileRequest {
     pub visibility: Option<String>,
 }
 
+#[derive(Serialize, ToSchema)]
+pub struct ProfileView {
+    pub user_id: String,
+    pub bio: Option<String>,
+    pub location: Option<String>,
+    pub visibility: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct EducationView {
+    pub id: String,
+    pub school: String,
+    pub degree: Option<String>,
+    pub field: Option<String>,
+    pub start_year: i32,
+    pub end_year: Option<i32>,
+    pub description: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct ExperienceView {
+    pub id: String,
+    pub title: String,
+    pub company: Option<String>,
+    pub organization_id: Option<String>,
+    pub start_date: chrono::NaiveDate,
+    pub end_date: Option<chrono::NaiveDate>,
+    pub current: bool,
+    pub description: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct SkillView {
+    pub skill: String,
+    pub level: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct ProfileResponse {
+    pub profile: ProfileView,
+    pub education: Vec<EducationView>,
+    pub experience: Vec<ExperienceView>,
+    pub skills: Vec<SkillView>,
+}
+
 /// Update the caller's own profile.
 #[utoipa::path(
     put,
     path = "/api/v1/me/profile",
     request_body = SetProfileRequest,
     responses(
-        (status = 200, description = "Updated profile", body = Value),
+        (status = 200, description = "Updated profile", body = ProfileView),
         (status = 401, description = "Missing or invalid access token"),
     ),
     security(("bearer_auth" = [])),
@@ -841,7 +918,7 @@ pub async fn set_profile(
     State(state): State<AppState>,
     auth_user: AuthUser,
     Json(req): Json<SetProfileRequest>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<ProfileView>> {
     let bio = req.bio.as_deref();
     if let Some(bio) = bio {
         validate_text(bio, "bio", TEXT_MAX)?;
@@ -856,14 +933,12 @@ pub async fn set_profile(
         )
         .await
         .map_err(map_repo_error)?;
-    Ok(Json(json!({
-        "profile": {
-            "user_id": profile.user_id.to_string(),
-            "bio": profile.bio,
-            "location": profile.location,
-            "visibility": profile.visibility,
-        }
-    })))
+    Ok(Json(ProfileView {
+        user_id: profile.user_id.to_string(),
+        bio: profile.bio,
+        location: profile.location,
+        visibility: profile.visibility,
+    }))
 }
 
 /// Fetch a profile. Visibility matrix: public → everyone, connections only,
@@ -873,7 +948,7 @@ pub async fn set_profile(
     path = "/api/v1/users/{user_id}/profile",
     params(("user_id" = Uuid, Path, description = "User id")),
     responses(
-        (status = 200, description = "Profile", body = Value),
+        (status = 200, description = "Profile", body = ProfileResponse),
         (status = 404, description = "Profile not found or hidden"),
     ),
     tag = "network"
@@ -882,7 +957,7 @@ pub async fn get_profile(
     State(state): State<AppState>,
     maybe: MaybeUser,
     Path(user_id): Path<Uuid>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<ProfileResponse>> {
     if !profile_visible(&state.pool, maybe.0.as_ref(), user_id).await? {
         return Err(ApiError::NotFound); // hide existence, never confirm it
     }
@@ -895,37 +970,46 @@ pub async fn get_profile(
     let education = profiles.education(user_id).await.map_err(map_repo_error)?;
     let experience = profiles.experience(user_id).await.map_err(map_repo_error)?;
     let skills = profiles.skills(user_id).await.map_err(map_repo_error)?;
-    Ok(Json(json!({
-        "profile": {
-            "user_id": user_id.to_string(),
-            "bio": profile.bio,
-            "location": profile.location,
-            "visibility": profile.visibility,
+    Ok(Json(ProfileResponse {
+        profile: ProfileView {
+            user_id: user_id.to_string(),
+            bio: profile.bio,
+            location: profile.location,
+            visibility: profile.visibility,
         },
-        "education": education.iter().map(|e| json!({
-            "id": e.id.to_string(),
-            "school": e.school,
-            "degree": e.degree,
-            "field": e.field,
-            "start_year": e.start_year,
-            "end_year": e.end_year,
-            "description": e.description,
-        })).collect::<Vec<_>>(),
-        "experience": experience.iter().map(|x| json!({
-            "id": x.id.to_string(),
-            "title": x.title,
-            "company": x.company,
-            "organization_id": x.organization_id.map(|o| o.to_string()),
-            "start_date": x.start_date,
-            "end_date": x.end_date,
-            "current": x.current,
-            "description": x.description,
-        })).collect::<Vec<_>>(),
-        "skills": skills.iter().map(|s| json!({
-            "skill": s.skill,
-            "level": s.level,
-        })).collect::<Vec<_>>(),
-    })))
+        education: education
+            .iter()
+            .map(|e| EducationView {
+                id: e.id.to_string(),
+                school: e.school.clone(),
+                degree: e.degree.clone(),
+                field: e.field.clone(),
+                start_year: e.start_year,
+                end_year: e.end_year,
+                description: e.description.clone(),
+            })
+            .collect(),
+        experience: experience
+            .iter()
+            .map(|x| ExperienceView {
+                id: x.id.to_string(),
+                title: x.title.clone(),
+                company: x.company.clone(),
+                organization_id: x.organization_id.map(|o| o.to_string()),
+                start_date: x.start_date,
+                end_date: x.end_date,
+                current: x.current,
+                description: x.description.clone(),
+            })
+            .collect(),
+        skills: skills
+            .iter()
+            .map(|s| SkillView {
+                skill: s.skill.clone(),
+                level: s.level.clone(),
+            })
+            .collect(),
+    }))
 }
 
 #[derive(Deserialize, ToSchema)]

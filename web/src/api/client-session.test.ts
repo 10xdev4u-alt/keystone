@@ -31,7 +31,7 @@ describe("session recovery", () => {
         }),
       ) // /auth/refresh
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ id: "u1", email: "a@b.dev" }), {
+        new Response(JSON.stringify({ user: { id: "u1", email: "a@b.dev" } }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         }),
@@ -39,7 +39,7 @@ describe("session recovery", () => {
 
     const { data, error } = await client.GET("/api/v1/auth/me");
     expect(error).toBeUndefined();
-    expect((data as { id: string }).id).toBe("u1");
+    expect((data as { user: { id: string } }).user.id).toBe("u1");
     expect(fetchMock).toHaveBeenCalledTimes(3); // me(401) → refresh → me(200)
     const calls = fetchMock.mock.calls.map((c) => {
       const input = c[0] as Request | string;

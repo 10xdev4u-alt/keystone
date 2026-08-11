@@ -219,6 +219,30 @@
         ]
       }
     },
+    "/api/v1/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Start a password reset. Same anti-enumeration posture as login: the\nresponse is identical whether or not the account exists. In dev the raw\ntoken is returned (mailer milestone emails it); only the hash is stored.",
+        "operationId": "forgot_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Reset token issued (dev: returned in body)"
+          }
+        }
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "tags": [
@@ -280,7 +304,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserView"
+                  "$ref": "#/components/schemas/MeResponse"
                 }
               }
             }
@@ -353,6 +377,33 @@
           },
           "409": {
             "description": "Email or username already registered"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/reset-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Complete a password reset: validates the token, then swaps the hash and\nburns the token atomically. Locked accounts are unlocked on success.",
+        "operationId": "reset_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Password updated"
+          },
+          "400": {
+            "description": "Invalid or expired token / weak password"
           }
         }
       }
@@ -791,7 +842,9 @@
             "description": "Community",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityDetailResponse"
+                }
               }
             }
           },
@@ -893,7 +946,9 @@
             "description": "Members",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/MemberList"
+                }
               }
             }
           },
@@ -1007,7 +1062,9 @@
             "description": "Posts page",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityPostList"
+                }
               }
             }
           },
@@ -1945,7 +2002,9 @@
             "description": "Events page",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/EventList"
+                }
               }
             }
           }
@@ -2780,7 +2839,9 @@
             "description": "Updated profile",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileView"
+                }
               }
             }
           },
@@ -3300,7 +3361,9 @@
             "description": "Organizations page",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/OrgList"
+                }
               }
             }
           }
@@ -3365,7 +3428,9 @@
             "description": "Organization",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/OrgDetailResponse"
+                }
               }
             }
           },
@@ -4866,6 +4931,42 @@
         }
       }
     },
+    "/api/v1/posts/{id}/related": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Related reading for a post — posts sharing tags, ranked by overlap.",
+        "operationId": "get_related",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Post id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Related posts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelatedPosts"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Post not found"
+          }
+        }
+      }
+    },
     "/api/v1/posts/{id}/versions": {
       "get": {
         "tags": [
@@ -5091,6 +5192,51 @@
                 "schema": {}
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Search everything the engine indexes.",
+        "operationId": "search",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Search query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size (1..=50)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ranked hits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Empty query"
           }
         }
       }
@@ -5486,7 +5632,9 @@
             "description": "Profile",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
               }
             }
           },
@@ -5739,6 +5887,18 @@
           }
         }
       },
+      "CommunityDetailResponse": {
+        "type": "object",
+        "description": "Single-community detail response.",
+        "required": [
+          "community"
+        ],
+        "properties": {
+          "community": {
+            "$ref": "#/components/schemas/CommunityView"
+          }
+        }
+      },
       "CommunityList": {
         "type": "object",
         "description": "Paged communities response.",
@@ -5751,6 +5911,45 @@
             "items": {
               "$ref": "#/components/schemas/CommunityView"
             }
+          }
+        }
+      },
+      "CommunityPostList": {
+        "type": "object",
+        "description": "Community posts response.",
+        "required": [
+          "posts"
+        ],
+        "properties": {
+          "posts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommunityPostRef"
+            }
+          }
+        }
+      },
+      "CommunityPostRef": {
+        "type": "object",
+        "description": "A post attached to a community.",
+        "required": [
+          "post_id",
+          "pinned",
+          "added_by",
+          "added_at"
+        ],
+        "properties": {
+          "added_at": {
+            "type": "string"
+          },
+          "added_by": {
+            "type": "string"
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "post_id": {
+            "type": "string"
           }
         }
       },
@@ -6098,6 +6297,121 @@
           }
         }
       },
+      "EducationView": {
+        "type": "object",
+        "required": [
+          "id",
+          "school",
+          "start_year"
+        ],
+        "properties": {
+          "degree": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_year": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "school": {
+            "type": "string"
+          },
+          "start_year": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "EventList": {
+        "type": "object",
+        "description": "Paged events response.",
+        "required": [
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventView"
+            }
+          }
+        }
+      },
+      "EventView": {
+        "type": "object",
+        "description": "Event card — the list contract.",
+        "required": [
+          "id",
+          "organizer_id",
+          "title",
+          "slug",
+          "starts_at",
+          "ends_at",
+          "status"
+        ],
+        "properties": {
+          "capacity": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ends_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "organizer_id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "starts_at": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
       "ExperienceRequest": {
         "type": "object",
         "required": [
@@ -6144,6 +6458,55 @@
           }
         }
       },
+      "ExperienceView": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "start_date",
+          "current"
+        ],
+        "properties": {
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organization_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
       "FeedbackRequest": {
         "type": "object",
         "required": [
@@ -6159,6 +6522,17 @@
           "rating": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "ForgotPasswordRequest": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
           }
         }
       },
@@ -6252,6 +6626,53 @@
           }
         }
       },
+      "MeResponse": {
+        "type": "object",
+        "description": "Current-user response wrapper.",
+        "required": [
+          "user"
+        ],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserView"
+          }
+        }
+      },
+      "MemberList": {
+        "type": "object",
+        "description": "Member list response.",
+        "required": [
+          "members"
+        ],
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberView"
+            }
+          }
+        }
+      },
+      "MemberView": {
+        "type": "object",
+        "description": "A member of a community.",
+        "required": [
+          "user_id",
+          "role",
+          "joined_at"
+        ],
+        "properties": {
+          "joined_at": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          }
+        }
+      },
       "MentorProfileRequest": {
         "type": "object",
         "required": [
@@ -6318,6 +6739,79 @@
           },
           "title": {
             "type": "string"
+          }
+        }
+      },
+      "OrgDetailResponse": {
+        "type": "object",
+        "description": "Single-organization detail response.",
+        "required": [
+          "organization"
+        ],
+        "properties": {
+          "organization": {
+            "$ref": "#/components/schemas/OrgView"
+          }
+        }
+      },
+      "OrgList": {
+        "type": "object",
+        "description": "Paged organizations response.",
+        "required": [
+          "organizations"
+        ],
+        "properties": {
+          "organizations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrgView"
+            }
+          }
+        }
+      },
+      "OrgView": {
+        "type": "object",
+        "description": "Organization card — the list and detail contract.",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "created_by",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "industry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "website": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -6602,6 +7096,65 @@
           }
         }
       },
+      "ProfileResponse": {
+        "type": "object",
+        "required": [
+          "profile",
+          "education",
+          "experience",
+          "skills"
+        ],
+        "properties": {
+          "education": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EducationView"
+            }
+          },
+          "experience": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExperienceView"
+            }
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileView"
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkillView"
+            }
+          }
+        }
+      },
+      "ProfileView": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "visibility"
+        ],
+        "properties": {
+          "bio": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          }
+        }
+      },
       "QuestionRequest": {
         "type": "object",
         "required": [
@@ -6667,6 +7220,57 @@
           }
         }
       },
+      "RelatedPostView": {
+        "type": "object",
+        "description": "A related-reading card: same tag family, ranked by overlap then recency.",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "slug"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "RelatedPosts": {
+        "type": "object",
+        "description": "Wrapper for the related-posts endpoint.",
+        "required": [
+          "posts"
+        ],
+        "properties": {
+          "posts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelatedPostView"
+            }
+          }
+        }
+      },
       "ReportQueueQuery": {
         "type": "object",
         "properties": {
@@ -6677,6 +7281,25 @@
           "offset": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "token",
+          "new_password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "new_password": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
           }
         }
       },
@@ -6741,6 +7364,75 @@
           },
           "role": {
             "type": "string"
+          }
+        }
+      },
+      "SearchHitView": {
+        "type": "object",
+        "description": "One ranked hit across posts, users, communities and courses.",
+        "required": [
+          "entity_type",
+          "entity_id",
+          "title",
+          "snippet",
+          "score"
+        ],
+        "properties": {
+          "entity_id": {
+            "type": "string"
+          },
+          "entity_type": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number",
+            "format": "double"
+          },
+          "snippet": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "SearchQuery": {
+        "type": "object",
+        "description": "Search request.",
+        "required": [
+          "q"
+        ],
+        "properties": {
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Page size (1..=50)."
+          },
+          "q": {
+            "type": "string",
+            "description": "The raw search string (FTS lexemes + typo fallback)."
+          }
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "description": "Search response — ranked hits for a query.",
+        "required": [
+          "query",
+          "results"
+        ],
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchHitView"
+            }
           }
         }
       },
@@ -6862,6 +7554,21 @@
         }
       },
       "SkillRequest": {
+        "type": "object",
+        "required": [
+          "skill",
+          "level"
+        ],
+        "properties": {
+          "level": {
+            "type": "string"
+          },
+          "skill": {
+            "type": "string"
+          }
+        }
+      },
+      "SkillView": {
         "type": "object",
         "required": [
           "skill",
@@ -7135,6 +7842,10 @@
     {
       "name": "qa",
       "description": "Answers, voting, bounties"
+    },
+    {
+      "name": "search",
+      "description": "Unified platform search"
     },
     {
       "name": "network",

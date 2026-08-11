@@ -22,8 +22,19 @@ type PostListPage = components["schemas"]["PostListPage"];
 type PostDetailResponse = components["schemas"]["PostDetailResponse"];
 type CommentList = components["schemas"]["CommentList"];
 type CommentResponse = components["schemas"]["CommentResponse"];
+type RelatedPosts = components["schemas"]["RelatedPosts"];
 type CreateCommentRequest = components["schemas"]["CreateCommentRequest"];
 type CommunityList = components["schemas"]["CommunityList"];
+type CommunityDetailResponse = components["schemas"]["CommunityDetailResponse"];
+type MemberList = components["schemas"]["MemberList"];
+type CommunityPostList = components["schemas"]["CommunityPostList"];
+type EventList = components["schemas"]["EventList"];
+type OrgList = components["schemas"]["OrgList"];
+type OrgDetailResponse = components["schemas"]["OrgDetailResponse"];
+type SearchResponse = components["schemas"]["SearchResponse"];
+type ProfileResponse = components["schemas"]["ProfileResponse"];
+type ProfileView = components["schemas"]["ProfileView"];
+type SetProfileRequest = components["schemas"]["SetProfileRequest"];
 
 /**
  * Caller-facing options for query wrapper hooks. The hook owns `queryKey` and
@@ -62,8 +73,8 @@ export function useCurrentUser(options?: QueryOptions<UserView>) {
     queryFn: async () => {
       const { data, error } = await client.GET("/api/v1/auth/me");
       if (error) throw error;
-      if (!data) throw new Error("Empty /auth/me response");
-      return data;
+      if (!data?.user) throw new Error("Empty /auth/me response");
+      return data.user;
     },
     retry: false,
     staleTime: 60_000,
@@ -125,6 +136,35 @@ export function useVerifyEmail(
       const { error } = await client.POST("/api/v1/auth/verify-email", {
         body: { token },
       });
+      if (error) throw error;
+    },
+    ...options,
+  });
+}
+
+export function useForgotPassword(
+  options?: UseMutationOptions<{ reset_token?: string }, ApiRequestError, { email: string }>,
+) {
+  return useMutation({
+    mutationFn: async (body) => {
+      const { data, error } = await client.POST("/api/v1/auth/forgot-password", { body });
+      if (error) throw error;
+      return data ?? {};
+    },
+    ...options,
+  });
+}
+
+export function useResetPassword(
+  options?: UseMutationOptions<void, ApiRequestError, {
+    email: string;
+    token: string;
+    new_password: string;
+  }>,
+) {
+  return useMutation({
+    mutationFn: async (body) => {
+      const { error } = await client.POST("/api/v1/auth/reset-password", { body });
       if (error) throw error;
     },
     ...options,
@@ -213,6 +253,26 @@ export function useCreateComment(
   });
 }
 
+export function useRelatedPosts(
+  postId: string,
+  options?: QueryOptions<RelatedPosts>,
+) {
+  return useQuery({
+    queryKey: ["posts", postId, "related"],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/posts/{id}/related", {
+        params: { path: { id: postId } },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty related response");
+      return data;
+    },
+    enabled: Boolean(postId),
+    staleTime: 5 * 60_000,
+    ...options,
+  });
+}
+
 // ── Social ──────────────────────────────────────────────────────────────────
 
 export function useCommunities(
@@ -236,7 +296,7 @@ export function useCommunities(
 
 export function useCommunity(
   slug: string,
-  options?: UseQueryOptions<unknown, ApiRequestError>,
+  options?: QueryOptions<CommunityDetailResponse>,
 ) {
   return useQuery({
     queryKey: ["communities", slug],
@@ -245,10 +305,72 @@ export function useCommunity(
         params: { path: { slug } },
       });
       if (error) throw error;
+      if (!data) throw new Error("Empty community response");
+      return data;
+    },
+    enabled: Boolean(slug),
+    staleTime: 30_000,
+    ...options,
+  });
+}
+
+export function useCommunityMembers(
+  slug: string,
+  options?: QueryOptions<MemberList>,
+) {
+  return useQuery({
+    queryKey: ["communities", slug, "members"],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/communities/{slug}/members", {
+        params: { path: { slug } },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty members response");
+      return data;
+    },
+    enabled: Boolean(slug),
+    staleTime: 60_000,
+    ...options,
+  });
+}
+
+export function useCommunityPosts(
+  slug: string,
+  options?: QueryOptions<CommunityPostList>,
+) {
+  return useQuery({
+    queryKey: ["communities", slug, "posts"],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/communities/{slug}/posts", {
+        params: { path: { slug } },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty community posts response");
       return data;
     },
     enabled: Boolean(slug),
     ...options,
+  });
+}
+
+export function useJoinCommunity(
+  slug: string,
+  options?: UseMutationOptions<void, ApiRequestError, void>,
+) {
+  const qc = useQueryClient();
+  const { onSuccess: userOnSuccess, ...rest } = options ?? {};
+  return useMutation({
+    ...rest,
+    mutationFn: async () => {
+      const { error } = await client.POST("/api/v1/communities/{slug}/join", {
+        params: { path: { slug } },
+      });
+      if (error) throw error;
+    },
+    onSuccess: (data, vars, ctx, mutation) => {
+      qc.invalidateQueries({ queryKey: ["communities", slug, "members"] });
+      userOnSuccess?.(data, vars, ctx, mutation);
+    },
   });
 }
 
@@ -273,7 +395,7 @@ export function useCourses(
 
 export function useEvents(
   query: operations["list_events"]["parameters"]["query"] = {},
-  options?: UseQueryOptions<unknown, ApiRequestError>,
+  options?: QueryOptions<EventList>,
 ) {
   return useQuery({
     queryKey: ["events", query],
@@ -282,8 +404,10 @@ export function useEvents(
         params: { query },
       });
       if (error) throw error;
+      if (!data) throw new Error("Empty events response");
       return data;
     },
+    staleTime: 30_000,
     ...options,
   });
 }
@@ -292,22 +416,65 @@ export function useEvents(
 
 export function useOrgs(
   query: operations["list_orgs"]["parameters"]["query"] = {},
-  options?: UseQueryOptions<unknown, ApiRequestError>,
+  options?: QueryOptions<OrgList>,
 ) {
   return useQuery({
     queryKey: ["orgs", query],
     queryFn: async () => {
       const { data, error } = await client.GET("/api/v1/orgs", { params: { query } });
       if (error) throw error;
+      if (!data) throw new Error("Empty orgs response");
       return data;
     },
+    staleTime: 30_000,
+    ...options,
+  });
+}
+
+/** Unified platform search — FTS + typo tolerance on the backend. */
+export function useSearch(
+  q: string,
+  options?: QueryOptions<SearchResponse>,
+) {
+  return useQuery({
+    queryKey: ["search", q],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/search", {
+        params: { query: { q } },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty search response");
+      return data;
+    },
+    enabled: q.trim().length > 0,
+    staleTime: 30_000,
+    ...options,
+  });
+}
+
+export function useOrg(
+  slug: string,
+  options?: QueryOptions<OrgDetailResponse>,
+) {
+  return useQuery({
+    queryKey: ["orgs", slug],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/orgs/{slug}", {
+        params: { path: { slug } },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty org response");
+      return data;
+    },
+    enabled: Boolean(slug),
+    staleTime: 30_000,
     ...options,
   });
 }
 
 export function useProfile(
   userId: string,
-  options?: UseQueryOptions<unknown, ApiRequestError>,
+  options?: QueryOptions<ProfileResponse>,
 ) {
   return useQuery({
     queryKey: ["profiles", userId],
@@ -316,9 +483,33 @@ export function useProfile(
         params: { path: { user_id: userId } },
       });
       if (error) throw error;
+      if (!data) throw new Error("Empty profile response");
       return data;
     },
     enabled: Boolean(userId),
+    staleTime: 30_000,
     ...options,
+  });
+}
+
+/** Update the caller's own profile (bio, location, visibility). */
+export function useUpdateProfile(
+  options?: UseMutationOptions<ProfileView, ApiRequestError, SetProfileRequest>,
+) {
+  const qc = useQueryClient();
+  const { onSuccess: userOnSuccess, ...rest } = options ?? {};
+  return useMutation({
+    ...rest,
+    mutationFn: async (body) => {
+      const { data, error } = await client.PUT("/api/v1/me/profile", { body });
+      if (error) throw error;
+      if (!data) throw new Error("Empty profile update response");
+      return data;
+    },
+    onSuccess: (data, vars, ctx, mutation) => {
+      qc.invalidateQueries({ queryKey: ["profiles"] });
+      qc.invalidateQueries({ queryKey: ["me"] });
+      userOnSuccess?.(data, vars, ctx, mutation);
+    },
   });
 }

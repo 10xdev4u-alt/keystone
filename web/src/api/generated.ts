@@ -76,6 +76,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/forgot-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a password reset. Same anti-enumeration posture as login: the
+         *     response is identical whether or not the account exists. In dev the raw
+         *     token is returned (mailer milestone emails it); only the hash is stored.
+         */
+        post: operations["forgot_password"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -164,6 +185,26 @@ export interface paths {
          *     (dev flow: the raw token is returned; the mailer milestone emails it).
          */
         post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete a password reset: validates the token, then swaps the hash and
+         *     burns the token atomically. Locked accounts are unlocked on success.
+         */
+        post: operations["reset_password"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1808,6 +1849,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/posts/{id}/related": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Related reading for a post — posts sharing tags, ranked by overlap. */
+        get: operations["get_related"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/posts/{id}/versions": {
         parameters: {
             query?: never;
@@ -1911,6 +1969,23 @@ export interface paths {
          *     Aggregated salary ranges for a role (anonymized, bucketed).
          */
         get: operations["salaries_for_role"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search everything the engine indexes. */
+        get: operations["search"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2149,9 +2224,24 @@ export interface components {
             parent_id?: string | null;
             post_id: string;
         };
+        /** @description Single-community detail response. */
+        CommunityDetailResponse: {
+            community: components["schemas"]["CommunityView"];
+        };
         /** @description Paged communities response. */
         CommunityList: {
             communities: components["schemas"]["CommunityView"][];
+        };
+        /** @description Community posts response. */
+        CommunityPostList: {
+            posts: components["schemas"]["CommunityPostRef"][];
+        };
+        /** @description A post attached to a community. */
+        CommunityPostRef: {
+            added_at: string;
+            added_by: string;
+            pinned: boolean;
+            post_id: string;
         };
         /** @description Community card — the list and detail contract. */
         CommunityView: {
@@ -2244,6 +2334,35 @@ export interface components {
             /** Format: int32 */
             start_year: number;
         };
+        EducationView: {
+            degree?: string | null;
+            description?: string | null;
+            /** Format: int32 */
+            end_year?: number | null;
+            field?: string | null;
+            id: string;
+            school: string;
+            /** Format: int32 */
+            start_year: number;
+        };
+        /** @description Paged events response. */
+        EventList: {
+            events: components["schemas"]["EventView"][];
+        };
+        /** @description Event card — the list contract. */
+        EventView: {
+            /** Format: int32 */
+            capacity?: number | null;
+            description?: string | null;
+            ends_at: string;
+            id: string;
+            location?: string | null;
+            organizer_id: string;
+            slug: string;
+            starts_at: string;
+            status: string;
+            title: string;
+        };
         ExperienceRequest: {
             company?: string | null;
             current: boolean;
@@ -2256,10 +2375,25 @@ export interface components {
             start_date: string;
             title: string;
         };
+        ExperienceView: {
+            company?: string | null;
+            current: boolean;
+            description?: string | null;
+            /** Format: date */
+            end_date?: string | null;
+            id: string;
+            organization_id?: string | null;
+            /** Format: date */
+            start_date: string;
+            title: string;
+        };
         FeedbackRequest: {
             comment?: string | null;
             /** Format: int32 */
             rating: number;
+        };
+        ForgotPasswordRequest: {
+            email: string;
         };
         LessonRequest: {
             content: string;
@@ -2292,6 +2426,20 @@ export interface components {
              */
             up_to?: number | null;
         };
+        /** @description Current-user response wrapper. */
+        MeResponse: {
+            user: components["schemas"]["UserView"];
+        };
+        /** @description Member list response. */
+        MemberList: {
+            members: components["schemas"]["MemberView"][];
+        };
+        /** @description A member of a community. */
+        MemberView: {
+            joined_at: string;
+            role: string;
+            user_id: string;
+        };
         MentorProfileRequest: {
             areas?: string | null;
             available: boolean;
@@ -2310,6 +2458,25 @@ export interface components {
             /** Format: int32 */
             position: number;
             title: string;
+        };
+        /** @description Single-organization detail response. */
+        OrgDetailResponse: {
+            organization: components["schemas"]["OrgView"];
+        };
+        /** @description Paged organizations response. */
+        OrgList: {
+            organizations: components["schemas"]["OrgView"][];
+        };
+        /** @description Organization card — the list and detail contract. */
+        OrgView: {
+            created_at: string;
+            created_by: string;
+            description?: string | null;
+            id: string;
+            industry?: string | null;
+            name: string;
+            slug: string;
+            website?: string | null;
         };
         PageQuery: {
             /** Format: int64 */
@@ -2394,6 +2561,18 @@ export interface components {
             /** Format: int64 */
             size_bytes: number;
         };
+        ProfileResponse: {
+            education: components["schemas"]["EducationView"][];
+            experience: components["schemas"]["ExperienceView"][];
+            profile: components["schemas"]["ProfileView"];
+            skills: components["schemas"]["SkillView"][];
+        };
+        ProfileView: {
+            bio?: string | null;
+            location?: string | null;
+            user_id: string;
+            visibility: string;
+        };
         QuestionRequest: {
             correct_response?: string | null;
             /** Format: int32 */
@@ -2413,11 +2592,29 @@ export interface components {
             /** Format: int32 */
             width?: number | null;
         };
+        /** @description A related-reading card: same tag family, ranked by overlap then recency. */
+        RelatedPostView: {
+            id: string;
+            kind: string;
+            published_at?: string | null;
+            slug: string;
+            summary?: string | null;
+            title: string;
+        };
+        /** @description Wrapper for the related-posts endpoint. */
+        RelatedPosts: {
+            posts: components["schemas"]["RelatedPostView"][];
+        };
         ReportQueueQuery: {
             /** Format: int64 */
             limit?: number;
             /** Format: int64 */
             offset?: number;
+        };
+        ResetPasswordRequest: {
+            email: string;
+            new_password: string;
+            token: string;
         };
         ResolveReportRequest: {
             resolution_note?: string | null;
@@ -2436,6 +2633,30 @@ export interface components {
             currency: string;
             location?: string | null;
             role: string;
+        };
+        /** @description One ranked hit across posts, users, communities and courses. */
+        SearchHitView: {
+            entity_id: string;
+            entity_type: string;
+            /** Format: double */
+            score: number;
+            snippet: string;
+            title: string;
+        };
+        /** @description Search request. */
+        SearchQuery: {
+            /**
+             * Format: int64
+             * @description Page size (1..=50).
+             */
+            limit?: number | null;
+            /** @description The raw search string (FTS lexemes + typo fallback). */
+            q: string;
+        };
+        /** @description Search response — ranked hits for a query. */
+        SearchResponse: {
+            query: string;
+            results: components["schemas"]["SearchHitView"][];
         };
         SendMessageRequest: {
             body: string;
@@ -2468,6 +2689,10 @@ export interface components {
             username?: string | null;
         };
         SkillRequest: {
+            level: string;
+            skill: string;
+        };
+        SkillView: {
             level: string;
             skill: string;
         };
@@ -2702,6 +2927,28 @@ export interface operations {
             };
         };
     };
+    forgot_password: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForgotPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Reset token issued (dev: returned in body) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     login: {
         parameters: {
             query?: never;
@@ -2766,7 +3013,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserView"];
+                    "application/json": components["schemas"]["MeResponse"];
                 };
             };
             /** @description Missing or invalid access token */
@@ -2836,6 +3083,35 @@ export interface operations {
             };
             /** @description Email or username already registered */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reset_password: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Password updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid or expired token / weak password */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3229,7 +3505,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CommunityDetailResponse"];
                 };
             };
             /** @description Community not found */
@@ -3322,7 +3598,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MemberList"];
                 };
             };
             /** @description Community not found */
@@ -3400,7 +3676,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CommunityPostList"];
                 };
             };
             /** @description Community not found */
@@ -4143,7 +4419,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EventList"];
                 };
             };
         };
@@ -4886,7 +5162,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ProfileView"];
                 };
             };
             /** @description Missing or invalid access token */
@@ -5351,7 +5627,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OrgList"];
                 };
             };
         };
@@ -5405,7 +5681,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OrgDetailResponse"];
                 };
             };
             /** @description Organization not found */
@@ -6618,6 +6894,36 @@ export interface operations {
             };
         };
     };
+    get_related: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Post id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Related posts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedPosts"];
+                };
+            };
+            /** @description Post not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     post_versions: {
         parameters: {
             query?: never;
@@ -6816,6 +7122,38 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query: {
+                /** @description Search query */
+                q: string;
+                /** @description Page size (1..=50) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ranked hits */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResponse"];
+                };
+            };
+            /** @description Empty query */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -7136,7 +7474,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ProfileResponse"];
                 };
             };
             /** @description Profile not found or hidden */

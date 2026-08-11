@@ -733,3 +733,59 @@ async fn feed_keyset_pagination_is_total_and_stable() {
     }
     assert_eq!(seen.len(), 7, "every post visited exactly once");
 }
+
+#[tokio::test]
+async fn related_ranks_tag_overlap_then_recency_excluding_self() {
+    let Some(pool) = test_pool().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let author = make_user(&pool, "related@example.com").await;
+    let posts = Posts::new(pool.clone());
+    let tags = Tags::new(pool.clone());
+
+    async fn create(
+        posts: &Posts,
+        tags: &Tags,
+        author: Uuid,
+        slug: &str,
+        tag_names: &[&str],
+    ) -> Uuid {
+        let p = posts
+            .create(NewPost {
+                author_id: author,
+                kind: "article",
+                title: Some(slug),
+                slug,
+                body: "body",
+                summary: None,
+                visibility: "public",
+            })
+            .await
+            .unwrap();
+        for name in tag_names {
+            let t = tags.ensure(name, name).await.unwrap();
+            tags.attach(p.id, t.id).await.unwrap();
+        }
+        p.id
+    }
+
+    // The seed post carries [rust, async].
+    let seed = create(&posts, &tags, author, "seed", &["rust", "async"]).await;
+    // Two shared tags → ranks above the single-shared-tag post.
+    let close = create(&posts, &tags, author, "close", &["rust", "async"]).await;
+    // One shared tag → ranks below.
+    let loose = create(&posts, &tags, author, "loose", &["rust"]).await;
+    // No shared tags → excluded.
+    let unrelated = create(&posts, &tags, author, "unrelated", &["sql"]).await;
+
+    let related = posts.related(seed, 10).await.unwrap();
+    let ids: Vec<Uuid> = related.iter().map(|p| p.id).collect();
+    assert!(!ids.contains(&seed), "must exclude the seed post itself");
+    assert!(
+        !ids.contains(&unrelated),
+        "must exclude posts with no shared tags"
+    );
+    assert_eq!(related[0].id, close, "higher tag overlap ranks first");
+    assert_eq!(related[1].id, loose, "lower overlap ranks second");
+}

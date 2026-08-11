@@ -41,14 +41,22 @@ vi.mock("../api/hooks", () => ({
   useComments: vi.fn(),
   useCreateComment: vi.fn(),
   useCurrentUser: vi.fn(),
+  useRelatedPosts: vi.fn(),
 }));
 
-import { useComments, useCreateComment, useCurrentUser, usePost } from "../api/hooks";
+import {
+  useComments,
+  useCreateComment,
+  useCurrentUser,
+  usePost,
+  useRelatedPosts,
+} from "../api/hooks";
 
 const mockUsePost = vi.mocked(usePost);
 const mockUseComments = vi.mocked(useComments);
 const mockUseCreateComment = vi.mocked(useCreateComment);
 const mockUseCurrentUser = vi.mocked(useCurrentUser);
+const mockUseRelatedPosts = vi.mocked(useRelatedPosts);
 
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -84,6 +92,32 @@ describe("PostPage", () => {
       isPending: false,
       mutateAsync: vi.fn().mockResolvedValue({ comment: commentsFixture.comments[0] }),
     } as never);
+    mockUseRelatedPosts.mockReturnValue({
+      data: { posts: [] },
+      isLoading: false,
+    } as never);
+  });
+
+  it("renders the related reading rail", () => {
+    mockUseCurrentUser.mockReturnValue({ data: { id: "1" }, isLoading: false } as never);
+    mockUseRelatedPosts.mockReturnValue({
+      data: {
+        posts: [
+          {
+            id: "33333333-3333-4333-8333-333333333333",
+            kind: "article",
+            title: "Async in practice",
+            slug: "async-in-practice",
+            summary: "A follow-up on ownership.",
+            published_at: null,
+          },
+        ],
+      },
+      isLoading: false,
+    } as never);
+    renderPage();
+    expect(screen.getByRole("heading", { name: "Related reading" })).toBeTruthy();
+    expect(screen.getByText("Async in practice")).toBeTruthy();
   });
 
   it("renders the post body and comments", () => {

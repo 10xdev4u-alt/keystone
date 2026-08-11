@@ -25,6 +25,24 @@ const PostPage = lazy(() =>
 const CommunitiesPage = lazy(() =>
   import("../pages/CommunitiesPage").then((m) => ({ default: m.CommunitiesPage })),
 );
+const CommunityPage = lazy(() =>
+  import("../pages/CommunityPage").then((m) => ({ default: m.CommunityPage })),
+);
+const EventsPage = lazy(() =>
+  import("../pages/EventsPage").then((m) => ({ default: m.EventsPage })),
+);
+const OrgsPage = lazy(() =>
+  import("../pages/OrgsPage").then((m) => ({ default: m.OrgsPage })),
+);
+const OrgPage = lazy(() =>
+  import("../pages/OrgPage").then((m) => ({ default: m.OrgPage })),
+);
+const SearchPage = lazy(() =>
+  import("../pages/SearchPage").then((m) => ({ default: m.SearchPage })),
+);
+const ProfilePage = lazy(() =>
+  import("../pages/ProfilePage").then((m) => ({ default: m.ProfilePage })),
+);
 const LoginPage = lazy(() =>
   import("../pages/auth/LoginPage").then((m) => ({ default: m.LoginPage })),
 );
@@ -33,6 +51,12 @@ const RegisterPage = lazy(() =>
 );
 const VerifyPage = lazy(() =>
   import("../pages/auth/VerifyPage").then((m) => ({ default: m.VerifyPage })),
+);
+const ForgotPasswordPage = lazy(() =>
+  import("../pages/auth/ForgotPasswordPage").then((m) => ({ default: m.ForgotPasswordPage })),
+);
+const ResetPasswordPage = lazy(() =>
+  import("../pages/auth/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage })),
 );
 
 function withSuspense(node: ReactNode): ReactNode {
@@ -61,16 +85,19 @@ export const routesConfig: RouteObject[] = [
       { path: "/posts", element: withSuspense(<HomePage />) },
       { path: "/posts/:id", element: withSuspense(<PostPage />) },
       { path: "/communities", element: withSuspense(<CommunitiesPage />) },
-      { path: "/communities/:slug", element: withSuspense(<Placeholder title="Community" />) },
-      { path: "/events", element: withSuspense(<Placeholder title="Events" />) },
+      { path: "/communities/:slug", element: withSuspense(<CommunityPage />) },
+      { path: "/events", element: withSuspense(<EventsPage />) },
       { path: "/events/:slug", element: withSuspense(<Placeholder title="Event" />) },
-      { path: "/orgs", element: withSuspense(<Placeholder title="Organizations" />) },
-      { path: "/orgs/:slug", element: withSuspense(<Placeholder title="Organization" />) },
-      { path: "/search", element: withSuspense(<Placeholder title="Search" />) },
+      { path: "/orgs", element: withSuspense(<OrgsPage />) },
+      { path: "/orgs/:slug", element: withSuspense(<OrgPage />) },
+      { path: "/search", element: withSuspense(<SearchPage />) },
+      { path: "/users/:userId", element: withSuspense(<ProfilePage />) },
       { path: "/courses", element: withSuspense(<Placeholder title="Courses" />) },
       { path: "/login", element: withSuspense(<LoginPage />) },
       { path: "/register", element: withSuspense(<RegisterPage />) },
       { path: "/verify", element: withSuspense(<VerifyPage />) },
+      { path: "/forgot-password", element: withSuspense(<ForgotPasswordPage />) },
+      { path: "/reset-password", element: withSuspense(<ResetPasswordPage />) },
       { path: "*", element: <NotFound /> },
     ],
   },

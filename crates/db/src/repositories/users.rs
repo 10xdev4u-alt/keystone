@@ -181,6 +181,18 @@ impl Users {
         Ok(count as u32)
     }
 
+    /// Replace the password hash (password reset flow). The caller has
+    /// already validated the reset token and the new password's strength.
+    pub async fn update_password(&self, id: Uuid, new_hash: &str) -> Result<(), RepoError> {
+        sqlx::query("UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1")
+            .bind(id)
+            .bind(new_hash)
+            .execute(&self.pool)
+            .await
+            .map_err(RepoError::from)?;
+        Ok(())
+    }
+
     pub async fn set_status(&self, id: Uuid, status: &str) -> Result<(), RepoError> {
         sqlx::query("UPDATE users SET status = $2 WHERE id = $1")
             .bind(id)

@@ -75,7 +75,7 @@ fn mock_provider(base: &str) -> keystone_config::OAuthProviderConfig {
 }
 
 async fn test_app() -> Option<(axum::Router, PgPool)> {
-    let pool = keystone_db::test_util::test_pool().await?;
+    let pool = keystone_db::test_util::test_pool_isolated().await?;
     keystone_db::test_util::setup(&pool)
         .await
         .expect("db setup");
