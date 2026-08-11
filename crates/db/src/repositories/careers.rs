@@ -145,8 +145,9 @@ impl Careers {
         Ok(benchmark)
     }
 
-    /// The aggregate row for a bucket. `None` until the bucket exists —
-    /// per-bucket persistence gates on source count at the API layer.
+    /// The aggregate row for a bucket, ONLY once it holds enough sources.
+    /// Sub-threshold rows are never readable — anonymity is enforced at the
+    /// read, not just the write (a 2-row bucket would deanonymize).
     pub async fn bucket(
         &self,
         role: &str,
@@ -159,28 +160,31 @@ impl Careers {
                    max_amount, source_count, created_at, updated_at
             FROM salary_benchmarks
             WHERE role = $1 AND location IS NOT DISTINCT FROM $2 AND currency = $3
+              AND source_count >= $4
             "#,
         )
         .bind(role)
         .bind(location)
         .bind(currency)
+        .bind(MIN_SOURCE_COUNT)
         .fetch_optional(&self.pool)
         .await?;
         Ok(benchmark)
     }
 
-    /// Buckets for a role, most-sourced first.
+    /// Buckets for a role, most-sourced first — readable buckets only.
     pub async fn for_role(&self, role: &str) -> Result<Vec<SalaryBenchmark>, RepoError> {
         let rows = sqlx::query_as::<_, SalaryBenchmark>(
             r#"
             SELECT id, role, location, currency, min_amount, median_amount,
                    max_amount, source_count, created_at, updated_at
             FROM salary_benchmarks
-            WHERE role = $1
+            WHERE role = $1 AND source_count >= $2
             ORDER BY source_count DESC, updated_at DESC
             "#,
         )
         .bind(role)
+        .bind(MIN_SOURCE_COUNT)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)

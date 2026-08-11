@@ -315,8 +315,9 @@ async fn salary_buckets_grow_bounds_without_identity() {
     };
     let careers = Careers::new(pool.clone());
 
-    // Merge five anonymized submissions into one bucket.
-    for amount in [90_000i64, 110_000, 100_000, 95_000, 120_000] {
+    // Merge five anonymized submissions into one bucket. Sub-threshold
+    // buckets are NEVER readable — anonymity is enforced at the read.
+    for (i, amount) in [90_000i64, 110_000, 100_000, 95_000, 120_000].into_iter().enumerate() {
         careers
             .merge_submission(&SalarySubmission {
                 role: "Engineer".into(),
@@ -326,12 +327,23 @@ async fn salary_buckets_grow_bounds_without_identity() {
             })
             .await
             .unwrap();
+        if i < 4 {
+            assert!(
+                careers
+                    .bucket("Engineer", Some("Berlin"), "EUR")
+                    .await
+                    .unwrap()
+                    .is_none(),
+                "sub-threshold bucket must not be readable ({} sources)",
+                i + 1
+            );
+        }
     }
     let bucket = careers
         .bucket("Engineer", Some("Berlin"), "EUR")
         .await
         .unwrap()
-        .expect("bucket exists after submissions");
+        .expect("bucket becomes readable at MIN_SOURCE_COUNT");
     assert_eq!(bucket.min_amount, 90_000);
     assert_eq!(bucket.max_amount, 120_000);
     assert_eq!(bucket.source_count, 5);
