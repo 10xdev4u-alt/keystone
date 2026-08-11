@@ -15,6 +15,7 @@ const postFixture = {
     body: "The full body of the post.",
     body_html: "<h2>Intro</h2><p>The full body of the post.</p><h3>Details</h3><p>More.</p>",
     summary: "Short.",
+    cover_image_url: "https://cdn.example.com/covers/test.jpg",
     status: "published",
     visibility: "public",
     view_count: 42,
@@ -136,6 +137,16 @@ describe("PostPage", () => {
     expect(screen.getByRole("heading", { name: "A post worth reading" })).toBeTruthy();
     expect(screen.getByText("The full body of the post.")).toBeTruthy();
     expect(screen.getByText("Great point, thanks for sharing.")).toBeTruthy();
+  });
+
+  it("renders cover art with safe loading attributes", () => {
+    mockUseCurrentUser.mockReturnValue({ data: { id: "1" }, isLoading: false } as never);
+    renderPage();
+    const cover = screen.getByAltText("") as HTMLImageElement;
+    expect(cover.className).toContain("post__cover");
+    expect(cover.src).toBe("https://cdn.example.com/covers/test.jpg");
+    expect(cover.getAttribute("loading")).toBe("lazy");
+    expect(cover.getAttribute("referrerpolicy")).toBe("no-referrer");
   });
 
   it("hides the comment form when signed out", () => {

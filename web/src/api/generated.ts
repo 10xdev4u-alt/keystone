@@ -2369,6 +2369,12 @@ export interface components {
         };
         CreatePostRequest: {
             body?: string;
+            /**
+             * @description Cover art URL — optional presentation metadata. Not an inline
+             *     resource: readers always load it with `referrerpolicy` + lazy
+             *     loading, and the value is opaque to the renderer.
+             */
+            cover_image_url?: string | null;
             kind: string;
             summary?: string | null;
             tags?: string[];
@@ -2591,12 +2597,16 @@ export interface components {
             /** Format: int64 */
             limit?: number;
         };
-        /** @description Full post — the reader view contract. */
         PostView: {
             author_id: string;
             body: string;
             /** @description Markdown rendered to sanitized HTML server-side (see `keystone_db::markdown`). */
             body_html: string;
+            /**
+             * @description Cover art URL — optional presentation metadata, loaded lazily and
+             *     without referrer by the reader.
+             */
+            cover_image_url?: string | null;
             created_at: string;
             id: string;
             kind: string;
@@ -2804,6 +2814,7 @@ export interface components {
         UpdatePostRequest: {
             body: string;
             change_note?: string | null;
+            cover_image_url?: string | null;
             summary?: string | null;
             tags?: string[] | null;
             title?: string | null;

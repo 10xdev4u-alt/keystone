@@ -217,6 +217,15 @@ export function PostPage() {
               <span className="post__visibility">{post.visibility}</span>
             </div>
             <h1 className="post__title">{post.title}</h1>
+            {post.cover_image_url && (
+              <img
+                className="post__cover"
+                src={post.cover_image_url}
+                alt=""
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
+            )}
             <div className="post__meta">
               {post.published_at && <time dateTime={post.published_at}>{timeAgo(post.published_at)}</time>}
               <span>{post.view_count} views</span>

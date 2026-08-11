@@ -19,6 +19,7 @@ pub struct Post {
     pub slug: String,
     pub body: String,
     pub summary: Option<String>,
+    pub cover_image_url: Option<String>,
     pub status: String,
     pub visibility: String,
     pub view_count: i64,
@@ -67,6 +68,7 @@ pub struct NewPost<'a> {
     pub slug: &'a str,
     pub body: &'a str,
     pub summary: Option<&'a str>,
+    pub cover_image_url: Option<&'a str>,
     pub visibility: &'a str,
 }
 
@@ -75,6 +77,7 @@ pub struct PostUpdate<'a> {
     pub title: Option<&'a str>,
     pub body: &'a str,
     pub summary: Option<&'a str>,
+    pub cover_image_url: Option<&'a str>,
     pub change_note: Option<&'a str>,
     pub editor_id: Uuid,
 }
@@ -97,10 +100,11 @@ impl Posts {
         let post = sqlx::query_as::<_, Post>(
             r#"
             INSERT INTO posts (author_id, kind, title, slug, body, summary,
-                               status, visibility, published_at)
-            VALUES ($1, $2, $3, $4, $5, $6, 'published', $7, now())
-            RETURNING id, author_id, kind, title, slug, body, summary, status,
-                      visibility, view_count, published_at, created_at, updated_at
+                               cover_image_url, status, visibility, published_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, 'published', $8, now())
+            RETURNING id, author_id, kind, title, slug, body, summary,
+                      cover_image_url, status, visibility, view_count,
+                      published_at, created_at, updated_at
             "#,
         )
         .bind(new_post.author_id)
@@ -109,6 +113,7 @@ impl Posts {
         .bind(new_post.slug)
         .bind(new_post.body)
         .bind(new_post.summary)
+        .bind(new_post.cover_image_url)
         .bind(new_post.visibility)
         .fetch_one(&mut *tx)
         .await
@@ -142,8 +147,9 @@ impl Posts {
     pub async fn get_by_slug(&self, slug: &str) -> Result<Option<Post>, RepoError> {
         let post = sqlx::query_as::<_, Post>(
             r#"
-            SELECT id, author_id, kind, title, slug, body, summary, status,
-                   visibility, view_count, published_at, created_at, updated_at
+            SELECT id, author_id, kind, title, slug, body, summary,
+                   cover_image_url, status, visibility, view_count, published_at,
+                   created_at, updated_at
             FROM posts
             WHERE slug = $1 AND deleted_at IS NULL
             "#,
@@ -158,8 +164,9 @@ impl Posts {
     pub async fn get_by_id(&self, id: Uuid) -> Result<Option<Post>, RepoError> {
         let post = sqlx::query_as::<_, Post>(
             r#"
-            SELECT id, author_id, kind, title, slug, body, summary, status,
-                   visibility, view_count, published_at, created_at, updated_at
+            SELECT id, author_id, kind, title, slug, body, summary,
+                   cover_image_url, status, visibility, view_count, published_at,
+                   created_at, updated_at
             FROM posts
             WHERE id = $1 AND deleted_at IS NULL
             "#,
@@ -186,8 +193,8 @@ impl Posts {
         let mut sql = String::from(
             r#"
             SELECT p.id, p.author_id, p.kind, p.title, p.slug, p.body, p.summary,
-                   p.status, p.visibility, p.view_count, p.published_at,
-                   p.created_at, p.updated_at,
+                   p.cover_image_url, p.status, p.visibility, p.view_count,
+                   p.published_at, p.created_at, p.updated_at,
                    pc.comment_count, pc.reaction_count, pc.bookmark_count
             FROM posts p
             JOIN post_counts pc ON pc.post_id = p.id
@@ -251,8 +258,8 @@ impl Posts {
         let rows = sqlx::query_as::<_, Post>(
             r#"
             SELECT p.id, p.author_id, p.kind, p.title, p.slug, p.body, p.summary,
-                   p.status, p.visibility, p.view_count, p.published_at,
-                   p.created_at, p.updated_at
+                   p.cover_image_url, p.status, p.visibility, p.view_count,
+                   p.published_at, p.created_at, p.updated_at
             FROM posts p
             JOIN post_tags pt ON pt.post_id = p.id
             WHERE p.id <> $1
@@ -329,16 +336,18 @@ impl Posts {
         let post = sqlx::query_as::<_, Post>(
             r#"
             UPDATE posts
-            SET title = $2, body = $3, summary = $4
+            SET title = $2, body = $3, summary = $4, cover_image_url = $5
             WHERE id = $1 AND deleted_at IS NULL
-            RETURNING id, author_id, kind, title, slug, body, summary, status,
-                      visibility, view_count, published_at, created_at, updated_at
+            RETURNING id, author_id, kind, title, slug, body, summary,
+                      cover_image_url, status, visibility, view_count,
+                      published_at, created_at, updated_at
             "#,
         )
         .bind(id)
         .bind(update.title)
         .bind(update.body)
         .bind(update.summary)
+        .bind(update.cover_image_url)
         .fetch_optional(&mut *tx)
         .await?;
         let Some(post) = post else {

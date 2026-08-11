@@ -33,6 +33,9 @@ use uuid::Uuid;
 const TITLE_MAX: usize = 200;
 const SUMMARY_MAX: usize = 500;
 const BODY_MAX: usize = 50_000;
+/// Cover art URLs ride as opaque metadata; 2048 keeps space for long
+/// signed-object URLs (S3 presigned paths can run several hundred chars).
+const COVER_URL_MAX: usize = 2048;
 const COMMENT_MAX: usize = 10_000;
 const TAG_MAX: usize = 20;
 const SLUG_SUFFIX_TRIES: u32 = 100;
@@ -82,6 +85,10 @@ pub(crate) fn slugify(title: &str) -> String {
 
 /// Build a unique slug: slugify the title, or fall back to a short random id,
 /// then retry with `-2`, `-3`, … on collision until the DB accepts it.
+/// Retry loop that also owns slug generation — the many arguments mirror the
+/// `CreatePostRequest` fields it funnels into `NewPost`; bundling them would
+/// just smuggle the request struct in and couple this to its serde shape.
+#[allow(clippy::too_many_arguments)]
 async fn unique_slug(
     posts: &Posts,
     author_id: Uuid,
@@ -89,6 +96,7 @@ async fn unique_slug(
     title: Option<&str>,
     body: &str,
     summary: Option<&str>,
+    cover_image_url: Option<&str>,
     visibility: &str,
 ) -> Result<keystone_db::repositories::posts::Post, ApiError> {
     let base = title
@@ -105,6 +113,7 @@ async fn unique_slug(
                 slug: &slug,
                 body,
                 summary,
+                cover_image_url,
                 visibility,
             })
             .await
@@ -132,6 +141,11 @@ pub struct CreatePostRequest {
     pub body: String,
     #[serde(default)]
     pub summary: Option<String>,
+    /// Cover art URL — optional presentation metadata. Not an inline
+    /// resource: readers always load it with `referrerpolicy` + lazy
+    /// loading, and the value is opaque to the renderer.
+    #[serde(default)]
+    pub cover_image_url: Option<String>,
     #[serde(default = "default_visibility")]
     pub visibility: String,
     #[serde(default)]
@@ -149,6 +163,8 @@ pub struct UpdatePostRequest {
     pub body: String,
     #[serde(default)]
     pub summary: Option<String>,
+    #[serde(default)]
+    pub cover_image_url: Option<String>,
     #[serde(default)]
     pub change_note: Option<String>,
     #[serde(default)]
@@ -253,9 +269,7 @@ impl FromRequestParts<AppState> for MaybeUser {
     }
 }
 
-// ── Post view (no counters for single read; counts come from the view) ─────
-
-/// Full post — the reader view contract.
+// ── Post view (no counters for single read; counts come from the view) ─────/// Full post — the reader view contract.
 #[derive(Debug, serde::Serialize, ToSchema)]
 pub struct PostView {
     pub id: String,
@@ -268,6 +282,10 @@ pub struct PostView {
     pub body_html: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
+    /// Cover art URL — optional presentation metadata, loaded lazily and
+    /// without referrer by the reader.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cover_image_url: Option<String>,
     pub status: String,
     pub visibility: String,
     pub view_count: i64,
@@ -288,10 +306,12 @@ fn post_view(post: &keystone_db::repositories::posts::Post) -> PostView {
         body: post.body.clone(),
         body_html: keystone_db::markdown::render(&post.body),
         summary: post.summary.clone(),
+        cover_image_url: post.cover_image_url.clone(),
         status: post.status.clone(),
         visibility: post.visibility.clone(),
         view_count: post.view_count,
         published_at: post.published_at.map(|t| t.to_rfc3339()),
+
         created_at: post.created_at.to_rfc3339(),
         updated_at: Some(post.updated_at.to_rfc3339()),
     }
@@ -341,6 +361,11 @@ pub async fn create_post(
     }
     validate_optional(req.title.as_deref(), "title", TITLE_MAX)?;
     validate_optional(req.summary.as_deref(), "summary", SUMMARY_MAX)?;
+    validate_optional(
+        req.cover_image_url.as_deref(),
+        "cover image URL",
+        COVER_URL_MAX,
+    )?;
     validate_text(&req.body, "body", BODY_MAX)?;
     if req.tags.len() > TAG_MAX {
         return Err(ApiError::BadRequest(format!(
@@ -356,6 +381,7 @@ pub async fn create_post(
         req.title.as_deref(),
         &req.body,
         req.summary.as_deref(),
+        req.cover_image_url.as_deref(),
         &req.visibility,
     )
     .await?;
@@ -623,6 +649,11 @@ pub async fn update_post(
 ) -> ApiResult<Json<Value>> {
     validate_optional(req.title.as_deref(), "title", TITLE_MAX)?;
     validate_optional(req.summary.as_deref(), "summary", SUMMARY_MAX)?;
+    validate_optional(
+        req.cover_image_url.as_deref(),
+        "cover image URL",
+        COVER_URL_MAX,
+    )?;
     validate_text(&req.body, "body", BODY_MAX)?;
 
     let posts = Posts::new(state.pool.clone());
@@ -642,6 +673,7 @@ pub async fn update_post(
                 title: req.title.as_deref(),
                 body: &req.body,
                 summary: req.summary.as_deref(),
+                cover_image_url: req.cover_image_url.as_deref(),
                 change_note: req.change_note.as_deref(),
                 editor_id: auth_user.user_id,
             },

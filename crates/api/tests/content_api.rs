@@ -1020,3 +1020,95 @@ async fn admin_status_and_user_directory_are_role_gated() {
         .any(|u| u["email"] == "alice-admin@example.com"));
     assert!(users.iter().all(|u| u["role"].is_string()));
 }
+
+#[tokio::test]
+async fn cover_art_round_trips_through_create_update_read() {
+    let Some((app, _pool)) = test_app().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let author = register_and_login(&app, "cover-api@example.com").await;
+
+    // Create with cover art.
+    let created = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/v1/posts",
+            Some(&author),
+            Some(json!({
+                "kind": "article",
+                "title": "Covered API",
+                "body": "Body.",
+                "cover_image_url": "https://cdn.example.com/covers/api-a.jpg",
+            })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(created.status(), StatusCode::CREATED);
+    let created_body = json_body(created).await;
+    assert_eq!(
+        created_body["post"]["cover_image_url"],
+        "https://cdn.example.com/covers/api-a.jpg"
+    );
+    let id = created_body["post"]["id"].as_str().unwrap().to_owned();
+
+    // Read by slug and by id both expose it.
+    for uri in [
+        "/api/v1/posts/covered-api".to_string(),
+        format!("/api/v1/posts/{id}"),
+    ] {
+        let read = app
+            .clone()
+            .oneshot(request("GET", &uri, None, None))
+            .await
+            .unwrap();
+        assert_eq!(read.status(), StatusCode::OK, "{uri}");
+        assert_eq!(
+            json_body(read).await["post"]["cover_image_url"],
+            "https://cdn.example.com/covers/api-a.jpg",
+            "{uri}"
+        );
+    }
+
+    // Update swaps the cover; omitted body still required.
+    let updated = app
+        .clone()
+        .oneshot(request(
+            "PATCH",
+            &format!("/api/v1/posts/{id}"),
+            Some(&author),
+            Some(json!({
+                "body": "Body v2.",
+                "cover_image_url": "https://cdn.example.com/covers/api-b.jpg",
+            })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(updated.status(), StatusCode::OK);
+    assert_eq!(
+        json_body(updated).await["post"]["cover_image_url"],
+        "https://cdn.example.com/covers/api-b.jpg"
+    );
+
+    // Clearing the cover works via an explicit null.
+    let cleared = app
+        .clone()
+        .oneshot(request(
+            "PATCH",
+            &format!("/api/v1/posts/{id}"),
+            Some(&author),
+            Some(json!({
+                "body": "Body v3.",
+                "cover_image_url": null,
+            })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(cleared.status(), StatusCode::OK);
+    let cleared_body = json_body(cleared).await;
+    assert!(
+        cleared_body["post"]["cover_image_url"].is_null(),
+        "cover cleared"
+    );
+}
