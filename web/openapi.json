@@ -280,7 +280,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserView"
+                  "$ref": "#/components/schemas/MeResponse"
                 }
               }
             }
@@ -791,7 +791,9 @@
             "description": "Community",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityDetailResponse"
+                }
               }
             }
           },
@@ -893,7 +895,9 @@
             "description": "Members",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/MemberList"
+                }
               }
             }
           },
@@ -1007,7 +1011,9 @@
             "description": "Posts page",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityPostList"
+                }
               }
             }
           },
@@ -5739,6 +5745,18 @@
           }
         }
       },
+      "CommunityDetailResponse": {
+        "type": "object",
+        "description": "Single-community detail response.",
+        "required": [
+          "community"
+        ],
+        "properties": {
+          "community": {
+            "$ref": "#/components/schemas/CommunityView"
+          }
+        }
+      },
       "CommunityList": {
         "type": "object",
         "description": "Paged communities response.",
@@ -5751,6 +5769,45 @@
             "items": {
               "$ref": "#/components/schemas/CommunityView"
             }
+          }
+        }
+      },
+      "CommunityPostList": {
+        "type": "object",
+        "description": "Community posts response.",
+        "required": [
+          "posts"
+        ],
+        "properties": {
+          "posts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommunityPostRef"
+            }
+          }
+        }
+      },
+      "CommunityPostRef": {
+        "type": "object",
+        "description": "A post attached to a community.",
+        "required": [
+          "post_id",
+          "pinned",
+          "added_by",
+          "added_at"
+        ],
+        "properties": {
+          "added_at": {
+            "type": "string"
+          },
+          "added_by": {
+            "type": "string"
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "post_id": {
+            "type": "string"
           }
         }
       },
@@ -6249,6 +6306,53 @@
             ],
             "format": "int64",
             "description": "Mark everything up to this id as read. `null` = mark all."
+          }
+        }
+      },
+      "MeResponse": {
+        "type": "object",
+        "description": "Current-user response wrapper.",
+        "required": [
+          "user"
+        ],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserView"
+          }
+        }
+      },
+      "MemberList": {
+        "type": "object",
+        "description": "Member list response.",
+        "required": [
+          "members"
+        ],
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberView"
+            }
+          }
+        }
+      },
+      "MemberView": {
+        "type": "object",
+        "description": "A member of a community.",
+        "required": [
+          "user_id",
+          "role",
+          "joined_at"
+        ],
+        "properties": {
+          "joined_at": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
           }
         }
       },

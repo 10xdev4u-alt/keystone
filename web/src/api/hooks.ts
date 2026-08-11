@@ -24,6 +24,9 @@ type CommentList = components["schemas"]["CommentList"];
 type CommentResponse = components["schemas"]["CommentResponse"];
 type CreateCommentRequest = components["schemas"]["CreateCommentRequest"];
 type CommunityList = components["schemas"]["CommunityList"];
+type CommunityDetailResponse = components["schemas"]["CommunityDetailResponse"];
+type MemberList = components["schemas"]["MemberList"];
+type CommunityPostList = components["schemas"]["CommunityPostList"];
 
 /**
  * Caller-facing options for query wrapper hooks. The hook owns `queryKey` and
@@ -62,8 +65,8 @@ export function useCurrentUser(options?: QueryOptions<UserView>) {
     queryFn: async () => {
       const { data, error } = await client.GET("/api/v1/auth/me");
       if (error) throw error;
-      if (!data) throw new Error("Empty /auth/me response");
-      return data;
+      if (!data?.user) throw new Error("Empty /auth/me response");
+      return data.user;
     },
     retry: false,
     staleTime: 60_000,
@@ -236,7 +239,7 @@ export function useCommunities(
 
 export function useCommunity(
   slug: string,
-  options?: UseQueryOptions<unknown, ApiRequestError>,
+  options?: QueryOptions<CommunityDetailResponse>,
 ) {
   return useQuery({
     queryKey: ["communities", slug],
@@ -245,10 +248,72 @@ export function useCommunity(
         params: { path: { slug } },
       });
       if (error) throw error;
+      if (!data) throw new Error("Empty community response");
+      return data;
+    },
+    enabled: Boolean(slug),
+    staleTime: 30_000,
+    ...options,
+  });
+}
+
+export function useCommunityMembers(
+  slug: string,
+  options?: QueryOptions<MemberList>,
+) {
+  return useQuery({
+    queryKey: ["communities", slug, "members"],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/communities/{slug}/members", {
+        params: { path: { slug } },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty members response");
+      return data;
+    },
+    enabled: Boolean(slug),
+    staleTime: 60_000,
+    ...options,
+  });
+}
+
+export function useCommunityPosts(
+  slug: string,
+  options?: QueryOptions<CommunityPostList>,
+) {
+  return useQuery({
+    queryKey: ["communities", slug, "posts"],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/communities/{slug}/posts", {
+        params: { path: { slug } },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty community posts response");
       return data;
     },
     enabled: Boolean(slug),
     ...options,
+  });
+}
+
+export function useJoinCommunity(
+  slug: string,
+  options?: UseMutationOptions<void, ApiRequestError, void>,
+) {
+  const qc = useQueryClient();
+  const { onSuccess: userOnSuccess, ...rest } = options ?? {};
+  return useMutation({
+    ...rest,
+    mutationFn: async () => {
+      const { error } = await client.POST("/api/v1/communities/{slug}/join", {
+        params: { path: { slug } },
+      });
+      if (error) throw error;
+    },
+    onSuccess: (data, vars, ctx, mutation) => {
+      qc.invalidateQueries({ queryKey: ["communities", slug, "members"] });
+      userOnSuccess?.(data, vars, ctx, mutation);
+    },
   });
 }
 

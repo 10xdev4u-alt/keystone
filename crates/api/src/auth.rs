@@ -528,35 +528,40 @@ pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> ApiRes
     Ok(response)
 }
 
+/// Current-user response wrapper.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct MeResponse {
+    pub user: UserView,
+}
+
 /// Current authenticated user.
 #[utoipa::path(
     get,
     path = "/api/v1/auth/me",
     responses(
-        (status = 200, description = "Current user", body = UserView),
+        (status = 200, description = "Current user", body = MeResponse),
         (status = 401, description = "Missing or invalid access token"),
     ),
     security(("bearer_auth" = [])),
     tag = "auth"
 )]
-pub async fn me(
-    State(state): State<AppState>,
-    auth_user: AuthUser,
-) -> ApiResult<Json<serde_json::Value>> {
+pub async fn me(State(state): State<AppState>, auth_user: AuthUser) -> ApiResult<Json<MeResponse>> {
     let users = Users::new(state.pool.clone());
     let user = users
         .find_by_id(auth_user.user_id)
         .await
         .map_err(map_repo_error)?
         .ok_or(ApiError::Unauthorized)?;
-    Ok(Json(json!({ "user": UserView {
-        id: user.id.to_string(),
-        email: user.email,
-        username: user.username,
-        role: user.role,
-        status: user.status,
-        is_verified: user.is_verified,
-    } })))
+    Ok(Json(MeResponse {
+        user: UserView {
+            id: user.id.to_string(),
+            email: user.email,
+            username: user.username,
+            role: user.role,
+            status: user.status,
+            is_verified: user.is_verified,
+        },
+    }))
 }
 
 // ── Session management ──────────────────────────────────────────────────────

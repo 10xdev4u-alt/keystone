@@ -126,6 +126,41 @@ pub struct CommunityList {
     pub communities: Vec<CommunityView>,
 }
 
+/// Single-community detail response.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct CommunityDetailResponse {
+    pub community: CommunityView,
+}
+
+/// A member of a community.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct MemberView {
+    pub user_id: String,
+    pub role: String,
+    pub joined_at: String,
+}
+
+/// Member list response.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct MemberList {
+    pub members: Vec<MemberView>,
+}
+
+/// A post attached to a community.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct CommunityPostRef {
+    pub post_id: String,
+    pub pinned: bool,
+    pub added_by: String,
+    pub added_at: String,
+}
+
+/// Community posts response.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct CommunityPostList {
+    pub posts: Vec<CommunityPostRef>,
+}
+
 fn community_view(c: &keystone_db::repositories::communities::Community) -> CommunityView {
     CommunityView {
         id: c.id.to_string(),
@@ -210,7 +245,7 @@ pub async fn create_community(
     path = "/api/v1/communities/{slug}",
     params(("slug" = String, Path, description = "Community slug")),
     responses(
-        (status = 200, description = "Community", body = Value),
+        (status = 200, description = "Community", body = CommunityDetailResponse),
         (status = 404, description = "Community not found"),
     ),
     tag = "social"
@@ -218,14 +253,16 @@ pub async fn create_community(
 pub async fn get_community(
     State(state): State<AppState>,
     Path(slug): Path<String>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<CommunityDetailResponse>> {
     let communities = Communities::new(state.pool.clone());
     let community = communities
         .get_by_slug(&slug)
         .await
         .map_err(map_repo_error)?
         .ok_or(ApiError::NotFound)?;
-    Ok(Json(json!({ "community": community_view(&community) })))
+    Ok(Json(CommunityDetailResponse {
+        community: community_view(&community),
+    }))
 }
 
 /// List communities (paged).
@@ -343,7 +380,7 @@ pub async fn leave_community(
     operation_id = "community_list_members",
     params(("slug" = String, Path, description = "Community slug")),
     responses(
-        (status = 200, description = "Members", body = Value),
+        (status = 200, description = "Members", body = MemberList),
         (status = 404, description = "Community not found"),
     ),
     tag = "social"
@@ -351,7 +388,7 @@ pub async fn leave_community(
 pub async fn list_members(
     State(state): State<AppState>,
     Path(slug): Path<String>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<MemberList>> {
     let communities = Communities::new(state.pool.clone());
     let community = communities
         .get_by_slug(&slug)
@@ -362,17 +399,15 @@ pub async fn list_members(
         .members(community.id)
         .await
         .map_err(map_repo_error)?;
-    let items: Vec<Value> = members
+    let items: Vec<MemberView> = members
         .iter()
-        .map(|m| {
-            json!({
-                "user_id": m.user_id.to_string(),
-                "role": m.role,
-                "joined_at": m.joined_at,
-            })
+        .map(|m| MemberView {
+            user_id: m.user_id.to_string(),
+            role: m.role.clone(),
+            joined_at: m.joined_at.to_rfc3339(),
         })
         .collect();
-    Ok(Json(json!({ "members": items })))
+    Ok(Json(MemberList { members: items }))
 }
 
 /// Change a member's role. Community staff only.
@@ -514,7 +549,7 @@ pub async fn add_community_post(
         ("offset" = Option<i64>, Query, description = "Page offset"),
     ),
     responses(
-        (status = 200, description = "Posts page", body = Value),
+        (status = 200, description = "Posts page", body = CommunityPostList),
         (status = 404, description = "Community not found"),
     ),
     tag = "social"
@@ -523,7 +558,7 @@ pub async fn list_community_posts(
     State(state): State<AppState>,
     Path(slug): Path<String>,
     Query(query): Query<PageQuery>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<CommunityPostList>> {
     let communities = Communities::new(state.pool.clone());
     let community = communities
         .get_by_slug(&slug)
@@ -535,18 +570,16 @@ pub async fn list_community_posts(
         .list(community.id, query.limit.clamp(1, 50), query.offset.max(0))
         .await
         .map_err(map_repo_error)?;
-    let items: Vec<Value> = rows
+    let items: Vec<CommunityPostRef> = rows
         .iter()
-        .map(|cp| {
-            json!({
-                "post_id": cp.post_id.to_string(),
-                "pinned": cp.pinned,
-                "added_by": cp.added_by.to_string(),
-                "added_at": cp.created_at,
-            })
+        .map(|cp| CommunityPostRef {
+            post_id: cp.post_id.to_string(),
+            pinned: cp.pinned,
+            added_by: cp.added_by.to_string(),
+            added_at: cp.created_at.to_rfc3339(),
         })
         .collect();
-    Ok(Json(json!({ "posts": items })))
+    Ok(Json(CommunityPostList { posts: items }))
 }
 
 /// Pin a post to the top of a community. Community staff only.

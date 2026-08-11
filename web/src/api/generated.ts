@@ -2149,9 +2149,24 @@ export interface components {
             parent_id?: string | null;
             post_id: string;
         };
+        /** @description Single-community detail response. */
+        CommunityDetailResponse: {
+            community: components["schemas"]["CommunityView"];
+        };
         /** @description Paged communities response. */
         CommunityList: {
             communities: components["schemas"]["CommunityView"][];
+        };
+        /** @description Community posts response. */
+        CommunityPostList: {
+            posts: components["schemas"]["CommunityPostRef"][];
+        };
+        /** @description A post attached to a community. */
+        CommunityPostRef: {
+            added_at: string;
+            added_by: string;
+            pinned: boolean;
+            post_id: string;
         };
         /** @description Community card — the list and detail contract. */
         CommunityView: {
@@ -2291,6 +2306,20 @@ export interface components {
              * @description Mark everything up to this id as read. `null` = mark all.
              */
             up_to?: number | null;
+        };
+        /** @description Current-user response wrapper. */
+        MeResponse: {
+            user: components["schemas"]["UserView"];
+        };
+        /** @description Member list response. */
+        MemberList: {
+            members: components["schemas"]["MemberView"][];
+        };
+        /** @description A member of a community. */
+        MemberView: {
+            joined_at: string;
+            role: string;
+            user_id: string;
         };
         MentorProfileRequest: {
             areas?: string | null;
@@ -2766,7 +2795,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserView"];
+                    "application/json": components["schemas"]["MeResponse"];
                 };
             };
             /** @description Missing or invalid access token */
@@ -3229,7 +3258,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CommunityDetailResponse"];
                 };
             };
             /** @description Community not found */
@@ -3322,7 +3351,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MemberList"];
                 };
             };
             /** @description Community not found */
@@ -3400,7 +3429,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CommunityPostList"];
                 };
             };
             /** @description Community not found */
