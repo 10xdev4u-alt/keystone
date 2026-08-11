@@ -28,6 +28,8 @@ type CommunityDetailResponse = components["schemas"]["CommunityDetailResponse"];
 type MemberList = components["schemas"]["MemberList"];
 type CommunityPostList = components["schemas"]["CommunityPostList"];
 type EventList = components["schemas"]["EventList"];
+type OrgList = components["schemas"]["OrgList"];
+type OrgDetailResponse = components["schemas"]["OrgDetailResponse"];
 
 /**
  * Caller-facing options for query wrapper hooks. The hook owns `queryKey` and
@@ -360,15 +362,37 @@ export function useEvents(
 
 export function useOrgs(
   query: operations["list_orgs"]["parameters"]["query"] = {},
-  options?: UseQueryOptions<unknown, ApiRequestError>,
+  options?: QueryOptions<OrgList>,
 ) {
   return useQuery({
     queryKey: ["orgs", query],
     queryFn: async () => {
       const { data, error } = await client.GET("/api/v1/orgs", { params: { query } });
       if (error) throw error;
+      if (!data) throw new Error("Empty orgs response");
       return data;
     },
+    staleTime: 30_000,
+    ...options,
+  });
+}
+
+export function useOrg(
+  slug: string,
+  options?: QueryOptions<OrgDetailResponse>,
+) {
+  return useQuery({
+    queryKey: ["orgs", slug],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/orgs/{slug}", {
+        params: { path: { slug } },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty org response");
+      return data;
+    },
+    enabled: Boolean(slug),
+    staleTime: 30_000,
     ...options,
   });
 }

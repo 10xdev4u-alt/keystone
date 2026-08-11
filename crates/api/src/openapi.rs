@@ -210,6 +210,9 @@ use utoipa::{Modify, OpenApi};
         crate::qa::CreateBountyRequest,
         crate::qa::AwardBountyRequest,
 
+        crate::network::OrgView,
+        crate::network::OrgList,
+        crate::network::OrgDetailResponse,
         crate::network::CreateOrgRequest,
         crate::network::SetRoleRequest,
         crate::network::ClaimRequest,

@@ -126,21 +126,23 @@ pub async fn create_org(
         ("offset" = Option<i64>, Query, description = "Page offset"),
     ),
     responses(
-        (status = 200, description = "Organizations page", body = Value),
+        (status = 200, description = "Organizations page", body = OrgList),
     ),
     tag = "network"
 )]
 pub async fn list_orgs(
     State(state): State<AppState>,
     Query(query): Query<PageQuery>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<OrgList>> {
     let orgs = Organizations::new(state.pool.clone());
     let rows = orgs
         .list(query.limit.clamp(1, 50), query.offset.max(0))
         .await
         .map_err(map_repo_error)?;
-    let items: Vec<Value> = rows.iter().map(org_json).collect();
-    Ok(Json(json!({ "organizations": items })))
+    let items: Vec<OrgView> = rows.iter().map(org_json).collect();
+    Ok(Json(OrgList {
+        organizations: items,
+    }))
 }
 
 /// Fetch an organization by slug.
@@ -149,7 +151,7 @@ pub async fn list_orgs(
     path = "/api/v1/orgs/{slug}",
     params(("slug" = String, Path, description = "Organization slug")),
     responses(
-        (status = 200, description = "Organization", body = Value),
+        (status = 200, description = "Organization", body = OrgDetailResponse),
         (status = 404, description = "Organization not found"),
     ),
     tag = "network"
@@ -157,14 +159,16 @@ pub async fn list_orgs(
 pub async fn get_org(
     State(state): State<AppState>,
     Path(slug): Path<String>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<OrgDetailResponse>> {
     let orgs = Organizations::new(state.pool.clone());
     let org = orgs
         .get_by_slug(&slug)
         .await
         .map_err(map_repo_error)?
         .ok_or(ApiError::NotFound)?;
-    Ok(Json(json!({ "organization": org_json(&org) })))
+    Ok(Json(OrgDetailResponse {
+        organization: org_json(&org),
+    }))
 }
 
 /// Join an organization.
@@ -464,17 +468,45 @@ pub async fn verify_claim(
     Ok(Json(json!({ "status": "approved" })))
 }
 
-fn org_json(org: &keystone_db::repositories::organizations::Organization) -> Value {
-    json!({
-        "id": org.id.to_string(),
-        "name": org.name,
-        "slug": org.slug,
-        "description": org.description,
-        "website": org.website,
-        "industry": org.industry,
-        "created_by": org.created_by.to_string(),
-        "created_at": org.created_at,
-    })
+/// Organization card — the list and detail contract.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct OrgView {
+    pub id: String,
+    pub name: String,
+    pub slug: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub website: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub industry: Option<String>,
+    pub created_by: String,
+    pub created_at: String,
+}
+
+/// Paged organizations response.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct OrgList {
+    pub organizations: Vec<OrgView>,
+}
+
+/// Single-organization detail response.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct OrgDetailResponse {
+    pub organization: OrgView,
+}
+
+fn org_json(org: &keystone_db::repositories::organizations::Organization) -> OrgView {
+    OrgView {
+        id: org.id.to_string(),
+        name: org.name.clone(),
+        slug: org.slug.clone(),
+        description: org.description.clone(),
+        website: org.website.clone(),
+        industry: org.industry.clone(),
+        created_by: org.created_by.to_string(),
+        created_at: org.created_at.to_rfc3339(),
+    }
 }
 
 /// Shared guard: fetch a live org by slug or 404. Used by network and

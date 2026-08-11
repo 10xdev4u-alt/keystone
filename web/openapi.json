@@ -3308,7 +3308,9 @@
             "description": "Organizations page",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/OrgList"
+                }
               }
             }
           }
@@ -3373,7 +3375,9 @@
             "description": "Organization",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/OrgDetailResponse"
+                }
               }
             }
           },
@@ -6494,6 +6498,79 @@
           },
           "title": {
             "type": "string"
+          }
+        }
+      },
+      "OrgDetailResponse": {
+        "type": "object",
+        "description": "Single-organization detail response.",
+        "required": [
+          "organization"
+        ],
+        "properties": {
+          "organization": {
+            "$ref": "#/components/schemas/OrgView"
+          }
+        }
+      },
+      "OrgList": {
+        "type": "object",
+        "description": "Paged organizations response.",
+        "required": [
+          "organizations"
+        ],
+        "properties": {
+          "organizations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrgView"
+            }
+          }
+        }
+      },
+      "OrgView": {
+        "type": "object",
+        "description": "Organization card — the list and detail contract.",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "created_by",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "industry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "website": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

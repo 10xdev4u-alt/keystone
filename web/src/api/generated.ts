@@ -2358,6 +2358,25 @@ export interface components {
             position: number;
             title: string;
         };
+        /** @description Single-organization detail response. */
+        OrgDetailResponse: {
+            organization: components["schemas"]["OrgView"];
+        };
+        /** @description Paged organizations response. */
+        OrgList: {
+            organizations: components["schemas"]["OrgView"][];
+        };
+        /** @description Organization card — the list and detail contract. */
+        OrgView: {
+            created_at: string;
+            created_by: string;
+            description?: string | null;
+            id: string;
+            industry?: string | null;
+            name: string;
+            slug: string;
+            website?: string | null;
+        };
         PageQuery: {
             /** Format: int64 */
             limit?: number;
@@ -5398,7 +5417,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OrgList"];
                 };
             };
         };
@@ -5452,7 +5471,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OrgDetailResponse"];
                 };
             };
             /** @description Organization not found */
