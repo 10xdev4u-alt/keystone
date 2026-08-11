@@ -74,7 +74,11 @@ async fn posts_create_read_update_version_and_soft_delete() {
     assert_eq!(by_id.id, post.id);
 
     // Counters come from the maintained view (zero everywhere at first).
-    let listed = posts.list(Some("article"), None, 10, 0).await.unwrap();
+    let listed = posts
+        .list(Some("article"), None, 10, None)
+        .await
+        .unwrap()
+        .posts;
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].comment_count, 0);
     assert_eq!(listed[0].reaction_count, 0);
@@ -113,7 +117,7 @@ async fn posts_create_read_update_version_and_soft_delete() {
     posts.soft_delete(post.id).await.unwrap().expect("deleted");
     assert!(posts.get_by_slug("hello-world").await.unwrap().is_none());
     assert!(posts.get_by_id(post.id).await.unwrap().is_none());
-    let listed = posts.list(None, None, 10, 0).await.unwrap();
+    let listed = posts.list(None, None, 10, None).await.unwrap().posts;
     assert!(listed.is_empty());
     // History survives deletion.
     assert_eq!(posts.versions(post.id).await.unwrap().len(), 2);
@@ -285,12 +289,12 @@ async fn reactions_upsert_and_remove() {
     );
 
     // Derived counter reflects exactly one reaction.
-    let listed = posts.list(None, None, 10, 0).await.unwrap();
+    let listed = posts.list(None, None, 10, None).await.unwrap().posts;
     assert_eq!(listed[0].reaction_count, 1);
 
     reactions.remove(post.id, author).await.unwrap();
     assert!(reactions.get(post.id, author).await.unwrap().is_none());
-    let listed = posts.list(None, None, 10, 0).await.unwrap();
+    let listed = posts.list(None, None, 10, None).await.unwrap().posts;
     assert_eq!(listed[0].reaction_count, 0);
 }
 
@@ -326,7 +330,7 @@ async fn bookmarks_add_list_remove() {
     );
 
     // Derived counter counts the bookmark once.
-    let listed = posts.list(None, None, 10, 0).await.unwrap();
+    let listed = posts.list(None, None, 10, None).await.unwrap().posts;
     assert_eq!(listed[0].bookmark_count, 1);
 
     assert!(bookmarks.remove(author, post.id).await.unwrap());
@@ -386,7 +390,7 @@ async fn counters_never_drift_under_concurrent_writes() {
         handle.await.expect("writer task must not panic");
     }
 
-    let listed = posts.list(None, None, 10, 0).await.unwrap();
+    let listed = posts.list(None, None, 10, None).await.unwrap().posts;
     assert_eq!(listed[0].comment_count, N as i64, "every comment counted");
     assert_eq!(
         listed[0].reaction_count, 1,
@@ -669,4 +673,63 @@ async fn reports_flow_lifecycle_and_moderation_trail() {
     assert_eq!(trail.len(), 1);
     assert_eq!(trail[0].action, "delete_post");
     assert_eq!(trail[0].moderator_id, moderator);
+}
+
+#[tokio::test]
+async fn feed_keyset_pagination_is_total_and_stable() {
+    // Keyset requirement: pages must not overlap, must not skip, and must
+    // cover every post exactly once even when created_at collides (the id
+    // tiebreak makes the ordering total).
+    let Some(pool) = test_pool().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let author = make_user(&pool, "pager@example.com").await;
+    let posts = Posts::new(pool.clone());
+
+    for i in 0..7 {
+        posts
+            .create(NewPost {
+                author_id: author,
+                kind: "post",
+                title: None,
+                slug: &format!("page-{i}"),
+                body: "hi",
+                summary: None,
+                visibility: "public",
+            })
+            .await
+            .unwrap();
+    }
+
+    // Page through 7 posts two at a time. Same-second inserts exercise the
+    // (created_at, id) tiebreak — created_at alone would be ambiguous.
+    // Contract: a page with `next_cursor: None` is the last page; a client
+    // must stop there, never re-query from the top.
+    let mut seen: Vec<Uuid> = Vec::new();
+    let mut before: Option<(chrono::DateTime<chrono::Utc>, Uuid)> = None;
+    loop {
+        let page = posts.list(None, None, 2, before).await.unwrap();
+        let exhausted = page.next_cursor.is_none();
+        for row in &page.posts {
+            assert!(
+                !seen.contains(&row.post.id),
+                "page {} duplicated a post",
+                seen.len()
+            );
+            seen.push(row.post.id);
+        }
+        // Newest-first ordering must hold across page boundaries.
+        for pair in page.posts.windows(2) {
+            assert!(
+                pair[0].post.created_at >= pair[1].post.created_at,
+                "feed must be newest-first"
+            );
+        }
+        if exhausted {
+            break;
+        }
+        before = page.next_cursor;
+    }
+    assert_eq!(seen.len(), 7, "every post visited exactly once");
 }

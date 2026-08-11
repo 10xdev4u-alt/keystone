@@ -16,6 +16,7 @@ use axum::extract::{FromRequestParts, Path, Query, State};
 use axum::http::request::Parts;
 use axum::http::StatusCode;
 use axum::Json;
+use chrono::{DateTime, Utc};
 use keystone_db::repositories::bookmarks::Bookmarks;
 use keystone_db::repositories::comments::{Comments, NewComment};
 use keystone_db::repositories::posts::{NewPost, PostUpdate, Posts};
@@ -198,8 +199,30 @@ pub struct PostQuery {
     pub author: Option<Uuid>,
     #[serde(default = "default_limit")]
     pub limit: i64,
+    /// Keyset cursor — opaque to clients, emitted as `next_cursor` by the
+    /// previous page. Replaces OFFSET, which degrades and duplicates under
+    /// concurrent inserts.
     #[serde(default)]
-    pub offset: i64,
+    pub before: Option<String>,
+}
+
+/// `{created_at_micros}:{id}` — microseconds match Postgres `timestamptz`
+/// exactly, and the UUID's hyphens never contain `:`, so splitting on the
+/// LAST `:` is unambiguous. The cursor is URL-safe (no `+`/`/`/`=`), so
+/// clients can pass it back in a query string verbatim.
+fn parse_cursor(raw: &str) -> Result<(DateTime<Utc>, Uuid), ApiError> {
+    let (ts, id) = raw.rsplit_once(':').ok_or_else(|| {
+        ApiError::BadRequest("invalid pagination cursor: expected micros:uuid".into())
+    })?;
+    let micros = ts
+        .parse::<i64>()
+        .map_err(|_| ApiError::BadRequest("invalid pagination cursor: bad timestamp".into()))?;
+    let created_at = DateTime::from_timestamp_micros(micros)
+        .ok_or_else(|| ApiError::BadRequest("invalid pagination cursor: bad timestamp".into()))?
+        .with_timezone(&Utc);
+    let id = Uuid::parse_str(id)
+        .map_err(|_| ApiError::BadRequest("invalid pagination cursor: bad id".into()))?;
+    Ok((created_at, id))
 }
 
 fn default_limit() -> i64 {
@@ -350,13 +373,20 @@ pub async fn list_posts(
     Query(query): Query<PostQuery>,
 ) -> ApiResult<Json<Value>> {
     let limit = query.limit.clamp(1, 50);
-    let offset = query.offset.max(0);
+    let before = match query.before.as_deref() {
+        None => None,
+        Some(raw) => Some(parse_cursor(raw)?),
+    };
     let posts = Posts::new(state.pool.clone());
-    let rows = posts
-        .list(query.kind.as_deref(), query.author, limit, offset)
+    let page = posts
+        .list(query.kind.as_deref(), query.author, limit, before)
         .await
         .map_err(map_repo_error)?;
-    let items: Vec<Value> = rows
+    let next_cursor = page
+        .next_cursor
+        .map(|(ts, id)| format!("{}:{}", ts.timestamp_micros(), id));
+    let items: Vec<Value> = page
+        .posts
         .into_iter()
         .map(|row| {
             json!({
@@ -377,7 +407,7 @@ pub async fn list_posts(
         })
         .collect();
     Ok(Json(
-        json!({ "posts": items, "limit": limit, "offset": offset }),
+        json!({ "posts": items, "limit": limit, "next_cursor": next_cursor }),
     ))
 }
 

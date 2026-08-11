@@ -822,3 +822,123 @@ async fn reports_moderation_queue_and_reviews() {
         .unwrap();
     assert_eq!(bad_rating.status(), StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn feed_paginates_by_keyset_cursor() {
+    // Keyset contract end-to-end: pages don't overlap, the last page has no
+    // cursor, a malformed cursor is a 400, and re-using a cursor is stable.
+    let Some((app, _pool)) = test_app().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let token = register_and_login(&app, "pager-api@example.com").await;
+
+    for i in 0..5 {
+        let created = app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/api/v1/posts",
+                Some(&token),
+                Some(json!({
+                    "kind": "post",
+                    "title": format!("Cursor post {i}"),
+                    "body": "hi",
+                })),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(created.status(), StatusCode::CREATED);
+    }
+
+    // Page 1: two posts, a live cursor.
+    let page1 = app
+        .clone()
+        .oneshot(request("GET", "/api/v1/posts?limit=2", None, None))
+        .await
+        .unwrap();
+    assert_eq!(page1.status(), StatusCode::OK);
+    let b1 = json_body(page1).await;
+    assert_eq!(b1["posts"].as_array().unwrap().len(), 2);
+    let cursor1 = b1["next_cursor"]
+        .as_str()
+        .expect("more pages exist")
+        .to_owned();
+    let ids1: Vec<String> = b1["posts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["id"].as_str().unwrap().to_owned())
+        .collect();
+
+    // Page 2: follows the cursor verbatim in the query string, no overlap.
+    let page2 = app
+        .clone()
+        .oneshot(request(
+            "GET",
+            &format!("/api/v1/posts?limit=2&before={cursor1}"),
+            None,
+            None,
+        ))
+        .await
+        .unwrap();
+    let b2 = json_body(page2).await;
+    assert_eq!(b2["posts"].as_array().unwrap().len(), 2);
+    for post in b2["posts"].as_array().unwrap() {
+        assert!(
+            !ids1.contains(&post["id"].as_str().unwrap().to_owned()),
+            "keyset page must not overlap the previous page"
+        );
+    }
+    let cursor2 = b2["next_cursor"].as_str().expect("still more").to_owned();
+
+    // Page 3: the last post — no next cursor.
+    let page3 = app
+        .clone()
+        .oneshot(request(
+            "GET",
+            &format!("/api/v1/posts?limit=2&before={cursor2}"),
+            None,
+            None,
+        ))
+        .await
+        .unwrap();
+    let b3 = json_body(page3).await;
+    assert_eq!(b3["posts"].as_array().unwrap().len(), 1);
+    assert!(
+        b3["next_cursor"].is_null(),
+        "the last page must not advertise a cursor"
+    );
+
+    // Re-using a cursor is idempotent: the same page comes back, not a 500
+    // and not a shifted window.
+    let tail = app
+        .clone()
+        .oneshot(request(
+            "GET",
+            &format!("/api/v1/posts?before={cursor2}"),
+            None,
+            None,
+        ))
+        .await
+        .unwrap();
+    let tail_body = json_body(tail).await;
+    assert_eq!(tail_body["posts"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        tail_body["posts"][0]["id"], b3["posts"][0]["id"],
+        "same cursor, same page"
+    );
+
+    // Malformed cursors are rejected, not crashed on.
+    let bad = app
+        .clone()
+        .oneshot(request(
+            "GET",
+            "/api/v1/posts?before=not-a-cursor",
+            None,
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(bad.status(), StatusCode::BAD_REQUEST);
+}
