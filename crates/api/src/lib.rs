@@ -14,6 +14,7 @@ pub mod chat;
 pub mod content;
 pub mod csrf;
 pub mod error;
+pub mod files;
 pub mod headers;
 pub mod learning_api;
 pub mod middleware;
@@ -50,6 +51,8 @@ pub struct AppState {
     pub realtime: Arc<realtime::RealtimeHub>,
     /// OAuth login; `None` when no provider is configured (routes absent).
     pub oauth: Option<oauth::OAuthService>,
+    /// Object-storage backend (presigned uploads/downloads).
+    pub storage: std::sync::Arc<dyn keystone_db::storage::StorageBackend>,
 }
 
 /// Build the API router with the given state.
@@ -418,6 +421,16 @@ pub fn router(state: AppState) -> Router {
             get(chat::conversation_presence),
         )
         .route("/api/v1/ws/chat/{id}", get(chat::chat_socket))
+        // ── Month 8: uploads (presigned) ─────────────────────────────────
+        .route("/api/v1/files/presign", post(files::presign))
+        .route(
+            "/api/v1/files",
+            get(files::list_files).post(files::register_file),
+        )
+        .route(
+            "/api/v1/files/{id}",
+            get(files::get_file).delete(files::delete_file),
+        )
         // ── Moderation (staff-only) ───────────────────────────────────────
         .merge(
             Router::new()
@@ -597,6 +610,7 @@ mod tests {
             rate_limit: std::sync::Arc::new(crate::middleware::RateLimiter::new()),
             realtime: std::sync::Arc::new(crate::realtime::RealtimeHub::new()),
             oauth: None,
+            storage: std::sync::Arc::new(keystone_db::storage::MemoryStorage::new()),
         })
     }
 

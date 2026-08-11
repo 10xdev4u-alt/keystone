@@ -63,6 +63,18 @@ async fn main() -> anyhow::Result<()> {
         None => None,
     };
 
+    // Object storage: S3/MinIO when configured, in-process memory otherwise.
+    // Fail-fast on an s3 backend with missing credentials — silent fallback
+    // to memory would lose uploads on restart.
+    let storage: std::sync::Arc<dyn keystone_db::storage::StorageBackend> =
+        match config.storage.backend.as_str() {
+            "s3" => std::sync::Arc::new(
+                keystone_db::storage::S3Storage::from_env(&config.storage.bucket)
+                    .map_err(|e| anyhow::anyhow!(e.to_string()))?,
+            ),
+            _ => std::sync::Arc::new(keystone_db::storage::MemoryStorage::new()),
+        };
+
     let state = AppState {
         pool,
         started_at: Instant::now(),
@@ -70,6 +82,7 @@ async fn main() -> anyhow::Result<()> {
         rate_limit: std::sync::Arc::new(keystone_api::middleware::RateLimiter::new()),
         realtime: std::sync::Arc::new(keystone_api::realtime::RealtimeHub::new()),
         oauth,
+        storage,
     };
     let mut app = router(state);
     if !config.app.cors_origins.is_empty() {

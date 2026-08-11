@@ -22,6 +22,7 @@ pub struct Config {
     pub app: AppConfig,
     pub log: LogConfig,
     pub auth: AuthConfig,
+    pub storage: StorageConfig,
 }
 
 /// Identity & session configuration.
@@ -105,6 +106,15 @@ pub struct LogConfig {
     pub filter: String,
 }
 
+/// Object-storage backend. `memory` keeps uploads in-process (dev/tests);
+/// `s3` uses the standard `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` /
+/// `AWS_REGION` / `AWS_ENDPOINT_URL_S3` variables (MinIO/S3-compatible).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StorageConfig {
+    pub backend: String,
+    pub bucket: String,
+}
+
 /// Errors produced while loading configuration.
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -148,6 +158,11 @@ impl Config {
 
         let log_filter = get("RUST_LOG").unwrap_or_else(|| "info,keystone=debug".into());
 
+        let storage = StorageConfig {
+            backend: get("STORAGE_BACKEND").unwrap_or_else(|| "memory".into()),
+            bucket: get("STORAGE_BUCKET").unwrap_or_else(|| "keystone".into()),
+        };
+
         let oauth = parse_oauth(source, &app_url, &api_url)?;
 
         let auth = AuthConfig {
@@ -181,6 +196,7 @@ impl Config {
             },
             log: LogConfig { filter: log_filter },
             auth,
+            storage,
         })
     }
 }
