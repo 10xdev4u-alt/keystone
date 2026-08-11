@@ -994,7 +994,10 @@ name = "keystone-db"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "hex",
+ "sha2",
  "sqlx",
+ "subtle",
  "thiserror",
  "tokio",
  "tracing",
