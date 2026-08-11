@@ -439,6 +439,95 @@ pub async fn reset_password(
     Ok(Json(json!({ "status": "password_updated" })).into_response())
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ChangePasswordRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
+/// Change the caller's password. Requires the current password (proof of
+/// control), then atomically swaps the hash and revokes every OTHER session —
+/// stolen-session tokens for the same account die on password change.
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/change-password",
+    request_body = ChangePasswordRequest,
+    responses(
+        (status = 200, description = "Password changed; other sessions revoked", body = Value),
+        (status = 400, description = "Weak new password"),
+        (status = 401, description = "Missing/invalid token or wrong current password"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "auth"
+)]
+pub async fn change_password(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    auth_user: AuthUser,
+    Json(req): Json<ChangePasswordRequest>,
+) -> ApiResult<Response> {
+    keystone_auth::password::validate(&req.new_password)
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+    let users = Users::new(state.pool.clone());
+    let user = users
+        .find_by_id(auth_user.user_id)
+        .await
+        .map_err(map_repo_error)?
+        .ok_or(ApiError::Unauthorized)?;
+    let stored = user
+        .password_hash
+        .as_deref()
+        .ok_or(ApiError::Unauthorized)?;
+    let current_ok = state
+        .auth
+        .password
+        .verify(&req.current_password, stored)
+        .map_err(|_| ApiError::Unauthorized)?;
+    if !current_ok {
+        audit(
+            &state.pool,
+            auth_user.user_id,
+            "auth.change_password_failed",
+            "user",
+            &auth_user.user_id.to_string(),
+            client_ip(&headers),
+        )
+        .await;
+        return Err(ApiError::Unauthorized);
+    }
+
+    let new_hash = state
+        .auth
+        .password
+        .hash(&req.new_password)
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+    // Hash swap + session revocation, in that order: even if a revocation
+    // races, the password change itself is authoritative. Both writes are
+    // single statements — no cross-statement transaction to fake.
+    users
+        .update_password(auth_user.user_id, &new_hash)
+        .await
+        .map_err(map_repo_error)?;
+    let sessions = Sessions::new(state.pool.clone());
+    sessions
+        .revoke_all_for_user(auth_user.user_id)
+        .await
+        .map_err(map_repo_error)?;
+
+    audit(
+        &state.pool,
+        auth_user.user_id,
+        "auth.change_password",
+        "user",
+        &auth_user.user_id.to_string(),
+        client_ip(&headers),
+    )
+    .await;
+    Ok(Json(json!({ "status": "password_changed" })).into_response())
+}
+
 /// Authenticate with email + password. Sets the httpOnly refresh cookie and
 /// returns the access token. Errors are deliberately generic (no enumeration).
 #[utoipa::path(

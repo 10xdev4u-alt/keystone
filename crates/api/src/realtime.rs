@@ -396,12 +396,31 @@ pub struct PreferencesRequest {
     pub quiet_hours_end: Option<i16>,
 }
 
+/// The caller's notification preferences — the typed contract for both the
+/// GET and PUT handlers (kills the previous `Value`-shaped responses).
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct NotificationPreferencesView {
+    pub in_app: bool,
+    pub digest: bool,
+    pub email: bool,
+    pub muted_kinds: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quiet_hours_start: Option<i16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quiet_hours_end: Option<i16>,
+}
+
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct PreferencesResponse {
+    pub preferences: NotificationPreferencesView,
+}
+
 /// The caller's notification preferences.
 #[utoipa::path(
     get,
     path = "/api/v1/notifications/preferences",
     responses(
-        (status = 200, description = "Preferences", body = Value),
+        (status = 200, description = "Preferences", body = PreferencesResponse),
         (status = 401, description = "Missing or invalid access token"),
     ),
     security(("bearer_auth" = [])),
@@ -410,22 +429,22 @@ pub struct PreferencesRequest {
 pub async fn get_preferences(
     State(state): State<AppState>,
     user: AuthUser,
-) -> Result<Json<JsonValue>, ApiError> {
+) -> Result<Json<PreferencesResponse>, ApiError> {
     let repo = Notifications::new(state.pool.clone());
     let prefs = repo
         .get_preferences(user.user_id)
         .await
         .map_err(map_repo_error)?;
-    Ok(Json(json!({
-        "preferences": {
-            "in_app": prefs.in_app,
-            "digest": prefs.digest,
-            "email": prefs.email,
-            "muted_kinds": prefs.muted_kinds,
-            "quiet_hours_start": prefs.quiet_hours_start,
-            "quiet_hours_end": prefs.quiet_hours_end,
-        }
-    })))
+    Ok(Json(PreferencesResponse {
+        preferences: NotificationPreferencesView {
+            in_app: prefs.in_app,
+            digest: prefs.digest,
+            email: prefs.email,
+            muted_kinds: prefs.muted_kinds,
+            quiet_hours_start: prefs.quiet_hours_start,
+            quiet_hours_end: prefs.quiet_hours_end,
+        },
+    }))
 }
 
 /// Update the caller's notification preferences.
@@ -434,7 +453,7 @@ pub async fn get_preferences(
     path = "/api/v1/notifications/preferences",
     request_body = PreferencesRequest,
     responses(
-        (status = 200, description = "Updated preferences", body = Value),
+        (status = 200, description = "Updated preferences", body = PreferencesResponse),
         (status = 401, description = "Missing or invalid access token"),
     ),
     security(("bearer_auth" = [])),
@@ -444,7 +463,7 @@ pub async fn update_preferences(
     State(state): State<AppState>,
     user: AuthUser,
     Json(req): Json<PreferencesRequest>,
-) -> Result<Json<JsonValue>, ApiError> {
+) -> Result<Json<PreferencesResponse>, ApiError> {
     let repo = Notifications::new(state.pool.clone());
     let prefs = repo
         .upsert_preferences(
@@ -460,14 +479,14 @@ pub async fn update_preferences(
         )
         .await
         .map_err(map_repo_error)?;
-    Ok(Json(json!({
-        "preferences": {
-            "in_app": prefs.in_app,
-            "digest": prefs.digest,
-            "email": prefs.email,
-            "muted_kinds": prefs.muted_kinds,
-            "quiet_hours_start": prefs.quiet_hours_start,
-            "quiet_hours_end": prefs.quiet_hours_end,
-        }
-    })))
+    Ok(Json(PreferencesResponse {
+        preferences: NotificationPreferencesView {
+            in_app: prefs.in_app,
+            digest: prefs.digest,
+            email: prefs.email,
+            muted_kinds: prefs.muted_kinds,
+            quiet_hours_start: prefs.quiet_hours_start,
+            quiet_hours_end: prefs.quiet_hours_end,
+        },
+    }))
 }

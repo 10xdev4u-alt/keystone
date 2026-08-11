@@ -305,6 +305,46 @@
         ]
       }
     },
+    "/api/v1/auth/change-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Change the caller's password. Requires the current password (proof of\ncontrol), then atomically swaps the hash and revokes every OTHER session —\nstolen-session tokens for the same account die on password change.",
+        "operationId": "change_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed; other sessions revoked",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "description": "Weak new password"
+          },
+          "401": {
+            "description": "Missing/invalid token or wrong current password"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/forgot-password": {
       "post": {
         "tags": [
@@ -3330,7 +3370,9 @@
             "description": "Preferences",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesResponse"
+                }
               }
             }
           },
@@ -3365,7 +3407,9 @@
             "description": "Updated preferences",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesResponse"
+                }
               }
             }
           },
@@ -6033,6 +6077,21 @@
           }
         }
       },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "properties": {
+          "current_password": {
+            "type": "string"
+          },
+          "new_password": {
+            "type": "string"
+          }
+        }
+      },
       "ClaimRequest": {
         "type": "object",
         "required": [
@@ -6967,6 +7026,47 @@
           }
         }
       },
+      "NotificationPreferencesView": {
+        "type": "object",
+        "description": "The caller's notification preferences — the typed contract for both the\nGET and PUT handlers (kills the previous `Value`-shaped responses).",
+        "required": [
+          "in_app",
+          "digest",
+          "email",
+          "muted_kinds"
+        ],
+        "properties": {
+          "digest": {
+            "type": "boolean"
+          },
+          "email": {
+            "type": "boolean"
+          },
+          "in_app": {
+            "type": "boolean"
+          },
+          "muted_kinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "quiet_hours_end": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "quiet_hours_start": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "OrgDetailResponse": {
         "type": "object",
         "description": "Single-organization detail response.",
@@ -7309,6 +7409,17 @@
               "null"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "PreferencesResponse": {
+        "type": "object",
+        "required": [
+          "preferences"
+        ],
+        "properties": {
+          "preferences": {
+            "$ref": "#/components/schemas/NotificationPreferencesView"
           }
         }
       },

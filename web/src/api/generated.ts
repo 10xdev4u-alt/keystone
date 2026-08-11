@@ -110,6 +110,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change the caller's password. Requires the current password (proof of
+         *     control), then atomically swaps the hash and revokes every OTHER session —
+         *     stolen-session tokens for the same account die on password change.
+         */
+        post: operations["change_password"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/forgot-password": {
         parameters: {
             query?: never;
@@ -2266,6 +2287,10 @@ export interface components {
             description?: string | null;
             title: string;
         };
+        ChangePasswordRequest: {
+            current_password: string;
+            new_password: string;
+        };
         ClaimRequest: {
             domain: string;
         };
@@ -2527,6 +2552,20 @@ export interface components {
             position: number;
             title: string;
         };
+        /**
+         * @description The caller's notification preferences — the typed contract for both the
+         *     GET and PUT handlers (kills the previous `Value`-shaped responses).
+         */
+        NotificationPreferencesView: {
+            digest: boolean;
+            email: boolean;
+            in_app: boolean;
+            muted_kinds: string[];
+            /** Format: int32 */
+            quiet_hours_end?: number | null;
+            /** Format: int32 */
+            quiet_hours_start?: number | null;
+        };
         /** @description Single-organization detail response. */
         OrgDetailResponse: {
             organization: components["schemas"]["OrgView"];
@@ -2628,6 +2667,9 @@ export interface components {
             quiet_hours_end?: number | null;
             /** Format: int32 */
             quiet_hours_start?: number | null;
+        };
+        PreferencesResponse: {
+            preferences: components["schemas"]["NotificationPreferencesView"];
         };
         PresignRequest: {
             content_type: string;
@@ -3102,6 +3144,44 @@ export interface operations {
                 };
             };
             /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    change_password: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Password changed; other sessions revoked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Weak new password */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing/invalid token or wrong current password */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -5696,7 +5776,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PreferencesResponse"];
                 };
             };
             /** @description Missing or invalid access token */
@@ -5727,7 +5807,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PreferencesResponse"];
                 };
             };
             /** @description Missing or invalid access token */

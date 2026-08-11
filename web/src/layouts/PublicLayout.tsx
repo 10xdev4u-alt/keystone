@@ -1,8 +1,51 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useNavigate } from "react-router-dom";
+import { useCurrentUser, useLogout } from "../api/hooks";
+import { Avatar } from "../components/Avatar/Avatar";
 import { OfflineIndicator } from "../components/OfflineIndicator/OfflineIndicator";
 import { publicNav } from "../navigation/registry";
 import { ShellNav } from "./ShellNav";
 import "./shell.css";
+
+function AuthActions() {
+  const navigate = useNavigate();
+  const { data: me } = useCurrentUser();
+  const logout = useLogout({
+    onSuccess: () => navigate("/"),
+  });
+
+  if (me) {
+    return (
+      <div className="shell__actions shell__actions--user">
+        <Link to="/me/profile" className="shell__user">
+          <Avatar name={me.username ?? me.email} size="sm" />
+          <span className="shell__user-name">{me.username ?? me.email}</span>
+        </Link>
+        <Link to="/me/settings" className="shell__link">
+          Settings
+        </Link>
+        <button
+          type="button"
+          className="shell__link shell__link--btn"
+          onClick={() => logout.mutate()}
+          disabled={logout.isPending}
+        >
+          {logout.isPending ? "Signing out…" : "Sign out"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="shell__actions">
+      <Link to="/login" className="shell__link">
+        Sign in
+      </Link>
+      <Link to="/register" className="shell__link shell__link--cta">
+        Join free
+      </Link>
+    </div>
+  );
+}
 
 /** Public marketing/content shell: header nav + footer. */
 export function PublicLayout() {
@@ -15,14 +58,7 @@ export function PublicLayout() {
           <span className="shell__brand-name">Keystone</span>
         </Link>
         <ShellNav items={publicNav} />
-        <div className="shell__actions">
-          <Link to="/login" className="shell__link">
-            Sign in
-          </Link>
-          <Link to="/register" className="shell__link shell__link--cta">
-            Join free
-          </Link>
-        </div>
+        <AuthActions />
       </header>
       <main className="shell__main">
         <Outlet />
