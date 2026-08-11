@@ -16,6 +16,7 @@ pub mod headers;
 pub mod middleware;
 pub mod moderation;
 pub mod oauth;
+pub mod qa;
 pub mod rbac;
 pub mod social;
 
@@ -158,6 +159,24 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/posts/{id}/lock",
             post(social::lock_post).delete(social::unlock_post),
         )
+        // ── Q&A ─────────────────────────────────────────────────────────
+        .route(
+            "/api/v1/posts/{id}/answers",
+            get(qa::list_answers).post(qa::create_answer),
+        )
+        .route(
+            "/api/v1/answers/{id}/vote",
+            axum::routing::put(qa::vote_answer),
+        )
+        .route(
+            "/api/v1/posts/{id}/answers/{answer_id}/accept",
+            post(qa::accept_answer),
+        )
+        .route(
+            "/api/v1/posts/{id}/bounty",
+            get(qa::get_bounty).post(qa::create_bounty),
+        )
+        .route("/api/v1/bounties/{id}/award", post(qa::award_bounty))
         .route("/api/v1/reports", post(moderation::file_report))
         .route(
             "/api/v1/reviews",
