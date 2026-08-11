@@ -19,14 +19,18 @@ use std::sync::Arc;
 use std::time::Instant;
 use tower::util::ServiceExt;
 
-async fn test_app() -> Option<(axum::Router, Arc<keystone_db::storage::MemoryStorage>)> {
+async fn test_app() -> Option<(
+    axum::Router,
+    Arc<keystone_db::storage::MemoryStorage>,
+    sqlx::PgPool,
+)> {
     let pool = keystone_db::test_util::test_pool_isolated().await?;
     keystone_db::test_util::setup(&pool)
         .await
         .expect("db setup");
     let storage = Arc::new(keystone_db::storage::MemoryStorage::new());
     let app = router(AppState {
-        pool,
+        pool: pool.clone(),
         started_at: Instant::now(),
         auth: test_auth(),
         rate_limit: Arc::new(keystone_api::middleware::RateLimiter::new()),
@@ -34,7 +38,7 @@ async fn test_app() -> Option<(axum::Router, Arc<keystone_db::storage::MemorySto
         storage: storage.clone(),
         oauth: None,
     });
-    Some((app, storage))
+    Some((app, storage, pool))
 }
 
 fn test_auth() -> keystone_api::auth::AuthServices {
@@ -154,7 +158,7 @@ async fn register_user(app: &Router, email: &str) -> (String, String) {
 
 #[tokio::test]
 async fn presign_upload_register_download_delete_round_trip() {
-    let Some((app, storage)) = test_app().await else {
+    let Some((app, storage, _pool)) = test_app().await else {
         eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
         return;
     };
@@ -274,15 +278,12 @@ async fn presign_upload_register_download_delete_round_trip() {
 
 #[tokio::test]
 async fn quota_overshoot_is_rejected_with_400() {
-    let Some((app, storage)) = test_app().await else {
+    let Some((app, storage, pool)) = test_app().await else {
         eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
         return;
     };
     let (alice, id) = register_user(&app, "files-quota@test.dev").await;
 
-    let pool = keystone_db::test_util::test_pool_isolated()
-        .await
-        .expect("test database reachable");
     let files = keystone_db::repositories::files::Files::new(pool);
     files
         .set_quota(uuid::Uuid::parse_str(&id).unwrap(), 128)
@@ -379,7 +380,7 @@ async fn quota_overshoot_is_rejected_with_400() {
 
 #[tokio::test]
 async fn forged_key_and_nonowner_access_are_rejected() {
-    let Some((app, _storage)) = test_app().await else {
+    let Some((app, _storage, _pool)) = test_app().await else {
         eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
         return;
     };
