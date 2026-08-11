@@ -94,6 +94,41 @@ pub struct RegisterRequest {
     height: Option<i32>,
 }
 
+// ── Response schemas ────────────────────────────────────────────────────────
+
+/// A file as seen by its owner.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct FileView {
+    pub id: String,
+    pub original_name: String,
+    pub content_type: String,
+    pub size_bytes: i64,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
+    pub created_at: String,
+    /// Fresh presigned download URL where available (list rows carry none).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub get_url: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct FileListResponse {
+    pub items: Vec<FileView>,
+}
+
+/// Presigned upload coordinates: PUT the bytes here, then register.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct PresignResponse {
+    pub key: String,
+    pub put_url: String,
+}
+
+/// File detail / register result.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct FileDetailResponse {
+    pub file: FileView,
+}
+
 // ── Handlers ────────────────────────────────────────────────────────────────
 
 /// `POST /api/v1/files/presign` — mint a server-keyed PUT url.
@@ -103,7 +138,7 @@ pub struct RegisterRequest {
     path = "/api/v1/files/presign",
     request_body = PresignRequest,
     responses(
-        (status = 200, description = "Presigned URL + upload params", body = Value),
+        (status = 200, description = "Presigned URL + upload params", body = PresignResponse),
         (status = 401, description = "Missing or invalid access token"),
     ),
     security(("bearer_auth" = [])),
@@ -113,7 +148,7 @@ pub async fn presign(
     State(state): State<AppState>,
     user: AuthUser,
     Json(req): Json<PresignRequest>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<PresignResponse>> {
     if req.size_bytes <= 0 || req.size_bytes > MAX_FILE_BYTES {
         return Err(ApiError::BadRequest(format!(
             "size must be within 1..={MAX_FILE_BYTES} bytes"
@@ -151,7 +186,7 @@ pub async fn presign(
         None,
     )
     .await;
-    Ok(Json(json!({ "key": key, "put_url": put_url })))
+    Ok(Json(PresignResponse { key, put_url }))
 }
 
 /// `POST /api/v1/files` — register metadata after the bytes are in the bucket.
@@ -162,7 +197,7 @@ pub async fn presign(
     path = "/api/v1/files",
     request_body = RegisterRequest,
     responses(
-        (status = 200, description = "Registered file record", body = Value),
+        (status = 200, description = "Registered file record", body = FileDetailResponse),
         (status = 401, description = "Missing or invalid access token"),
     ),
     security(("bearer_auth" = [])),
@@ -172,7 +207,7 @@ pub async fn register_file(
     State(state): State<AppState>,
     user: AuthUser,
     Json(req): Json<RegisterRequest>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<FileDetailResponse>> {
     if req.size_bytes <= 0 || req.size_bytes > MAX_FILE_BYTES {
         return Err(ApiError::BadRequest(format!(
             "size must be within 1..={MAX_FILE_BYTES} bytes"
@@ -243,17 +278,18 @@ pub async fn register_file(
         None,
     )
     .await;
-    Ok(Json(json!({
-        "id": row.id,
-        "key": row.object_key,
-        "original_name": row.original_name,
-        "content_type": row.content_type,
-        "size_bytes": row.size_bytes,
-        "width": thumb_w,
-        "height": thumb_h,
-        "created_at": row.created_at,
-        "get_url": get_url,
-    })))
+    Ok(Json(FileDetailResponse {
+        file: FileView {
+            id: row.id.to_string(),
+            original_name: row.original_name,
+            content_type: row.content_type,
+            size_bytes: row.size_bytes,
+            width: thumb_w,
+            height: thumb_h,
+            created_at: row.created_at.to_rfc3339(),
+            get_url: Some(get_url),
+        },
+    }))
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -273,7 +309,7 @@ fn default_limit() -> i64 {
     get,
     path = "/api/v1/files",
     responses(
-        (status = 200, description = "File list", body = Value),
+        (status = 200, description = "File list", body = FileListResponse),
         (status = 401, description = "Missing or invalid access token"),
     ),
     security(("bearer_auth" = [])),
@@ -283,13 +319,26 @@ pub async fn list_files(
     State(state): State<AppState>,
     user: AuthUser,
     Query(params): Query<ListParams>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<FileListResponse>> {
     let files = Files::new(state.pool.clone());
     let rows = files
         .list_for_owner(user.user_id, params.before, params.limit)
         .await
         .map_err(map_repo_error)?;
-    Ok(Json(json!({ "items": rows })))
+    let items = rows
+        .into_iter()
+        .map(|r| FileView {
+            id: r.id.to_string(),
+            original_name: r.original_name,
+            content_type: r.content_type,
+            size_bytes: r.size_bytes,
+            width: r.width,
+            height: r.height,
+            created_at: r.created_at.to_rfc3339(),
+            get_url: None,
+        })
+        .collect();
+    Ok(Json(FileListResponse { items }))
 }
 
 /// `GET /api/v1/files/{id}` — metadata + a fresh presigned download url.
@@ -301,7 +350,7 @@ pub async fn list_files(
     path = "/api/v1/files/{id}",
     params(("id" = Uuid, Path, description = "File id")),
     responses(
-        (status = 200, description = "File record + download URL", body = Value),
+        (status = 200, description = "File record + download URL", body = FileDetailResponse),
         (status = 401, description = "Missing or invalid access token"),
         (status = 403, description = "Not the owner and not staff"),
     ),
@@ -312,7 +361,7 @@ pub async fn get_file(
     State(state): State<AppState>,
     user: AuthUser,
     Path(id): Path<Uuid>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<FileDetailResponse>> {
     let files = Files::new(state.pool.clone());
     let row = files
         .get(id)
@@ -330,16 +379,18 @@ pub async fn get_file(
             tracing::error!(error = %e, "presign get failed");
             ApiError::Internal
         })?;
-    Ok(Json(json!({
-        "id": row.id,
-        "original_name": row.original_name,
-        "content_type": row.content_type,
-        "size_bytes": row.size_bytes,
-        "width": row.width,
-        "height": row.height,
-        "created_at": row.created_at,
-        "get_url": get_url,
-    })))
+    Ok(Json(FileDetailResponse {
+        file: FileView {
+            id: row.id.to_string(),
+            original_name: row.original_name,
+            content_type: row.content_type,
+            size_bytes: row.size_bytes,
+            width: row.width,
+            height: row.height,
+            created_at: row.created_at.to_rfc3339(),
+            get_url: Some(get_url),
+        },
+    }))
 }
 
 /// `DELETE /api/v1/files/{id}` — owner only. Metadata row is removed first;

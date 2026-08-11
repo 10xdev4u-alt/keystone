@@ -43,6 +43,14 @@ vi.mock("../api/hooks", () => ({
     isPending: false,
     error: null,
   })),
+  useMyFiles: vi.fn(() => ({
+    data: { items: [] },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+  useUploadFile: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
   useEvents: vi.fn(() => ({
     data: { events: [] },
     isLoading: false,

@@ -14,6 +14,12 @@ import {
 import { ApiRequestError, client, setTokens } from "./client";
 import type { components, operations } from "./generated";
 
+/** Hex SHA-256 of a file's bytes (WebCrypto) — the upload integrity hash. */
+async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 type TokenResponse = components["schemas"]["TokenResponse"];
 type UserView = components["schemas"]["UserView"];
 type RegisterRequest = components["schemas"]["SignupRequest"];
@@ -28,6 +34,8 @@ type ConversationResponse = components["schemas"]["ConversationResponse"];
 type EventDetailResponse = components["schemas"]["EventDetailResponse"];
 type CourseListResponse = components["schemas"]["CourseListResponse"];
 type CourseDetailResponse = components["schemas"]["CourseDetailResponse"];
+type FileListResponse = components["schemas"]["FileListResponse"];
+type FileDetailResponse = components["schemas"]["FileDetailResponse"];
 type LoginRequest = components["schemas"]["LoginRequest"];
 type PostListPage = components["schemas"]["PostListPage"];
 type PostDetailResponse = components["schemas"]["PostDetailResponse"];
@@ -443,6 +451,73 @@ export function useCreateConversation(
     },
     onSuccess: (data, vars, ctx, mutation) => {
       qc.invalidateQueries({ queryKey: ["conversations"] });
+      options?.onSuccess?.(data, vars, ctx, mutation);
+    },
+  });
+}
+
+/** The caller's uploaded files. */
+export function useMyFiles(options?: QueryOptions<FileListResponse>) {
+  return useQuery({
+    queryKey: ["files"],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/files");
+      if (error) throw error;
+      if (!data) throw new Error("Empty files response");
+      return data;
+    },
+    staleTime: 15_000,
+    ...options,
+  });
+}
+
+/**
+ * Upload a file: presign → PUT bytes to the storage URL → register.
+ * Returns the registered file record.
+ */
+export function useUploadFile(
+  options?: UseMutationOptions<FileDetailResponse, ApiRequestError, { file: File }>,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    ...options,
+    mutationFn: async ({ file }) => {
+      const { data: presign, error: presignError } = await client.POST(
+        "/api/v1/files/presign",
+        {
+          body: {
+            original_name: file.name,
+            content_type: file.type || "application/octet-stream",
+            size_bytes: file.size,
+          },
+        },
+      );
+      if (presignError) throw presignError;
+      if (!presign) throw new Error("Empty presign response");
+
+      const put = await fetch(presign.put_url, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!put.ok) throw new Error(`Upload to storage failed (${put.status})`);
+
+      const sha256 = await sha256Hex(await file.arrayBuffer());
+      const { data, error } = await client.POST("/api/v1/files", {
+        body: {
+          key: presign.key,
+          original_name: file.name,
+          content_type: file.type || "application/octet-stream",
+          size_bytes: file.size,
+          sha256,
+        },
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Empty register response");
+      return data;
+    },
+    onSuccess: (data, vars, ctx, mutation) => {
+      qc.invalidateQueries({ queryKey: ["files"] });
       options?.onSuccess?.(data, vars, ctx, mutation);
     },
   });

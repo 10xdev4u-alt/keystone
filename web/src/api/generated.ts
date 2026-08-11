@@ -2535,6 +2535,28 @@ export interface components {
             /** Format: int32 */
             rating: number;
         };
+        /** @description File detail / register result. */
+        FileDetailResponse: {
+            file: components["schemas"]["FileView"];
+        };
+        FileListResponse: {
+            items: components["schemas"]["FileView"][];
+        };
+        /** @description A file as seen by its owner. */
+        FileView: {
+            content_type: string;
+            created_at: string;
+            /** @description Fresh presigned download URL where available (list rows carry none). */
+            get_url?: string | null;
+            /** Format: int32 */
+            height?: number | null;
+            id: string;
+            original_name: string;
+            /** Format: int64 */
+            size_bytes: number;
+            /** Format: int32 */
+            width?: number | null;
+        };
         ForgotPasswordRequest: {
             email: string;
         };
@@ -2778,6 +2800,11 @@ export interface components {
             original_name: string;
             /** Format: int64 */
             size_bytes: number;
+        };
+        /** @description Presigned upload coordinates: PUT the bytes here, then register. */
+        PresignResponse: {
+            key: string;
+            put_url: string;
         };
         ProfileResponse: {
             education: components["schemas"]["EducationView"][];
@@ -4977,7 +5004,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FileListResponse"];
                 };
             };
             /** @description Missing or invalid access token */
@@ -5008,7 +5035,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FileDetailResponse"];
                 };
             };
             /** @description Missing or invalid access token */
@@ -5039,7 +5066,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PresignResponse"];
                 };
             };
             /** @description Missing or invalid access token */
@@ -5069,7 +5096,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FileDetailResponse"];
                 };
             };
             /** @description Missing or invalid access token */
