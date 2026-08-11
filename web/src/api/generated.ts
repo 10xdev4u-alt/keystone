@@ -255,7 +255,6 @@ export interface paths {
         /**
          * List the authenticated user's live sessions; the one matching the current
          *     refresh cookie is marked `current`.
-         *     List live sessions for the current user (marks the current one).
          */
         get: operations["list_sessions"];
         put?: never;
@@ -2755,11 +2754,27 @@ export interface components {
         SendMessageRequest: {
             body: string;
         };
+        /** @description Wrapper for the sessions list endpoint. */
+        SessionListResponse: {
+            sessions: components["schemas"]["SessionView"][];
+        };
         SessionRequest: {
             /** Format: int32 */
             duration_minutes: number;
             /** Format: date-time */
             scheduled_at: string;
+        };
+        /**
+         * @description One live session as the client sees it. `current` marks the session whose
+         *     refresh cookie this browser is holding — never reveal the token itself.
+         */
+        SessionView: {
+            created_at: string;
+            current: boolean;
+            expires_at: string;
+            id: string;
+            ip_address?: string | null;
+            user_agent?: string | null;
         };
         SetMemberRoleRequest: {
             role: string;
@@ -3301,7 +3316,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SessionListResponse"];
+                };
             };
             /** @description Missing or invalid access token */
             401: {

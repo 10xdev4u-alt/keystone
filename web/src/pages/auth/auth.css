@@ -50,6 +50,45 @@
   color: var(--color-text-muted);
 }
 
+.auth-card__divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  margin: var(--space-3, 0.75rem) 0;
+  color: var(--color-text-muted, #667);
+  font: var(--type-body-sm);
+}
+
+.auth-card__divider::before,
+.auth-card__divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-border, #e5e7eb);
+}
+
+.auth-card__oauth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #1a1a1a);
+  font: var(--type-body-sm);
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.auth-card__oauth:hover {
+  border-color: var(--color-primary, #7b87f4);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.08);
+}
+
 .auth-card__forgot {
   margin: 0;
   text-align: right;

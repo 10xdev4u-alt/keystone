@@ -43,6 +43,9 @@ const SearchPage = lazy(() =>
 const ProfilePage = lazy(() =>
   import("../pages/ProfilePage").then((m) => ({ default: m.ProfilePage })),
 );
+const SessionsPage = lazy(() =>
+  import("../pages/SessionsPage").then((m) => ({ default: m.SessionsPage })),
+);
 const AdminOverviewPage = lazy(() =>
   import("../pages/admin/AdminOverviewPage").then((m) => ({ default: m.AdminOverviewPage })),
 );
@@ -119,6 +122,7 @@ export const routesConfig: RouteObject[] = [
       { path: "/me/conversations", element: withSuspense(<Placeholder title="Messages" />) },
       { path: "/me/files", element: withSuspense(<Placeholder title="My files" />) },
       { path: "/me/profile", element: withSuspense(<Placeholder title="Profile" />) },
+      { path: "/me/sessions", element: withSuspense(<SessionsPage />) },
       { path: "/me/settings", element: withSuspense(<Placeholder title="Settings" />) },
     ],
   },

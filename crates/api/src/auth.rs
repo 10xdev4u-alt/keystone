@@ -713,14 +713,33 @@ pub async fn me(State(state): State<AppState>, auth_user: AuthUser) -> ApiResult
 
 // ── Session management ──────────────────────────────────────────────────────
 
+/// One live session as the client sees it. `current` marks the session whose
+/// refresh cookie this browser is holding — never reveal the token itself.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct SessionView {
+    pub id: String,
+    pub created_at: String,
+    pub expires_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ip_address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_agent: Option<String>,
+    pub current: bool,
+}
+
+/// Wrapper for the sessions list endpoint.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct SessionListResponse {
+    pub sessions: Vec<SessionView>,
+}
+
 /// List the authenticated user's live sessions; the one matching the current
 /// refresh cookie is marked `current`.
-/// List live sessions for the current user (marks the current one).
 #[utoipa::path(
     get,
     path = "/api/v1/auth/sessions",
     responses(
-        (status = 200, description = "Live sessions"),
+        (status = 200, description = "Live sessions", body = SessionListResponse),
         (status = 401, description = "Missing or invalid access token"),
     ),
     security(("bearer_auth" = [])),
@@ -730,7 +749,7 @@ pub async fn list_sessions(
     State(state): State<AppState>,
     headers: HeaderMap,
     auth_user: AuthUser,
-) -> ApiResult<Json<serde_json::Value>> {
+) -> ApiResult<Json<SessionListResponse>> {
     let sessions = Sessions::new(state.pool.clone());
     let current_hash = read_refresh_cookie(&headers).map(|t| tokens::hash_refresh_token(&t));
     let list = sessions
@@ -738,21 +757,19 @@ pub async fn list_sessions(
         .await
         .map_err(map_repo_error)?;
 
-    let sessions_json: Vec<serde_json::Value> = list
-        .iter()
-        .map(|s| {
-            json!({
-                "id": s.id,
-                "created_at": s.created_at,
-                "expires_at": s.expires_at,
-                "ip_address": s.ip_address.as_ref().map(|ip| ip.to_string()),
-                "user_agent": s.user_agent,
-                "current": current_hash.as_deref() == Some(s.refresh_token_hash.as_str()),
+    Ok(Json(SessionListResponse {
+        sessions: list
+            .into_iter()
+            .map(|s| SessionView {
+                id: s.id.to_string(),
+                created_at: s.created_at.to_rfc3339(),
+                expires_at: s.expires_at.to_rfc3339(),
+                ip_address: s.ip_address.map(|ip| ip.to_string()),
+                user_agent: s.user_agent,
+                current: current_hash.as_deref() == Some(s.refresh_token_hash.as_str()),
             })
-        })
-        .collect();
-
-    Ok(Json(json!({ "sessions": sessions_json })))
+            .collect(),
+    }))
 }
 
 /// Revoke one session. Ownership is enforced: another user's session id

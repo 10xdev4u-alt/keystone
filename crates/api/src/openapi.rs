@@ -185,6 +185,8 @@ use utoipa::{Modify, OpenApi};
         crate::auth::LoginRequest,
         crate::auth::UserView,
         crate::auth::MeResponse,
+        crate::auth::SessionView,
+        crate::auth::SessionListResponse,
         crate::auth::TokenResponse,
         crate::content::CreatePostRequest,
         crate::content::UpdatePostRequest,

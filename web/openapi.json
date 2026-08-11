@@ -499,11 +499,18 @@
         "tags": [
           "auth"
         ],
-        "summary": "List the authenticated user's live sessions; the one matching the current\nrefresh cookie is marked `current`.\nList live sessions for the current user (marks the current one).",
+        "summary": "List the authenticated user's live sessions; the one matching the current\nrefresh cookie is marked `current`.",
         "operationId": "list_sessions",
         "responses": {
           "200": {
-            "description": "Live sessions"
+            "description": "Live sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionListResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Missing or invalid access token"
@@ -7743,6 +7750,21 @@
           }
         }
       },
+      "SessionListResponse": {
+        "type": "object",
+        "description": "Wrapper for the sessions list endpoint.",
+        "required": [
+          "sessions"
+        ],
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionView"
+            }
+          }
+        }
+      },
       "SessionRequest": {
         "type": "object",
         "required": [
@@ -7757,6 +7779,42 @@
           "scheduled_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "SessionView": {
+        "type": "object",
+        "description": "One live session as the client sees it. `current` marks the session whose\nrefresh cookie this browser is holding — never reveal the token itself.",
+        "required": [
+          "id",
+          "created_at",
+          "expires_at",
+          "current"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "ip_address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_agent": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

@@ -1,0 +1,116 @@
+.sessions {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+.sessions__header {
+  margin-bottom: 1.5rem;
+}
+
+.sessions__title {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.sessions__subtitle {
+  margin: 0;
+  color: var(--color-text-muted, #667);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.sessions__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sessions__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 10px;
+  background: var(--color-surface, #fff);
+}
+
+.sessions__item-main {
+  min-width: 0;
+}
+
+.sessions__item-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.25rem;
+}
+
+.sessions__device {
+  font-size: 0.95rem;
+}
+
+.sessions__badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-accent, #2f6fed);
+  background: color-mix(in srgb, var(--color-accent, #2f6fed) 12%, transparent);
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+}
+
+.sessions__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #667);
+}
+
+.sessions__ua {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 22rem;
+}
+
+.sessions__revoke {
+  flex-shrink: 0;
+}
+
+.sessions__danger {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.sessions__danger-text {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--color-danger, #b91c1c);
+}
+
+.sessions__danger-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+@media (max-width: 560px) {
+  .sessions__item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sessions__revoke {
+    align-self: flex-end;
+  }
+}
