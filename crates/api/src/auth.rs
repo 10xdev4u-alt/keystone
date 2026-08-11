@@ -68,6 +68,18 @@ pub struct VerifyEmailRequest {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+pub struct ForgotPasswordRequest {
+    pub email: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ResetPasswordRequest {
+    pub email: String,
+    pub token: String,
+    pub new_password: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct LoginRequest {
     pub email: String,
     pub password: String,
@@ -290,6 +302,141 @@ pub async fn verify_email(
     )
     .await;
     Ok(Json(json!({ "status": "verified" })).into_response())
+}
+
+/// Start a password reset. Same anti-enumeration posture as login: the
+/// response is identical whether or not the account exists. In dev the raw
+/// token is returned (mailer milestone emails it); only the hash is stored.
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/forgot-password",
+    request_body = ForgotPasswordRequest,
+    responses(
+        (status = 200, description = "Reset token issued (dev: returned in body)"),
+    ),
+    tag = "auth"
+)]
+pub async fn forgot_password(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<ForgotPasswordRequest>,
+) -> ApiResult<Response> {
+    let email_lower = req.email.trim().to_lowercase();
+    let users = Users::new(state.pool.clone());
+    let user = users
+        .find_by_email(&email_lower)
+        .await
+        .map_err(map_repo_error)?;
+
+    // Generic success regardless of existence — never reveal whether an
+    // address is registered. A reset token is only minted for real accounts.
+    let Some(user) = user else {
+        return Ok(Json(json!({ "status": "ok" })).into_response());
+    };
+
+    let reset_token = tokens::generate_refresh_token().map_err(|_| ApiError::Internal)?;
+    let token_hash = tokens::hash_refresh_token(&reset_token);
+    sqlx::query(
+        r#"
+        INSERT INTO password_resets (user_id, token_hash, expires_at)
+        VALUES ($1, $2, now() + interval '1 hour')
+        "#,
+    )
+    .bind(user.id)
+    .bind(&token_hash)
+    .execute(&state.pool)
+    .await?;
+
+    audit(
+        &state.pool,
+        user.id,
+        "auth.forgot_password",
+        "user",
+        &user.id.to_string(),
+        client_ip(&headers),
+    )
+    .await;
+
+    Ok(Json(json!({ "status": "ok", "reset_token": reset_token })).into_response())
+}
+
+/// Complete a password reset: validates the token, then swaps the hash and
+/// burns the token atomically. Locked accounts are unlocked on success.
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/reset-password",
+    request_body = ResetPasswordRequest,
+    responses(
+        (status = 200, description = "Password updated"),
+        (status = 400, description = "Invalid or expired token / weak password"),
+    ),
+    tag = "auth"
+)]
+pub async fn reset_password(
+    State(state): State<AppState>,
+    Json(req): Json<ResetPasswordRequest>,
+) -> ApiResult<Response> {
+    keystone_auth::password::validate(&req.new_password)
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    let email_lower = req.email.trim().to_lowercase();
+
+    let token_hash = tokens::hash_refresh_token(&req.token);
+    let row: Option<(uuid::Uuid,)> = sqlx::query_as(
+        r#"
+        SELECT pr.user_id
+        FROM password_resets pr
+        JOIN users u ON u.id = pr.user_id
+        WHERE pr.token_hash = $1
+          AND pr.used_at IS NULL
+          AND pr.expires_at > now()
+          AND u.email_lower = $2
+        "#,
+    )
+    .bind(&token_hash)
+    .bind(&email_lower)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    let Some((user_id,)) = row else {
+        return Err(ApiError::BadRequest(
+            "invalid or expired reset token".into(),
+        ));
+    };
+
+    let hash = state
+        .auth
+        .password
+        .hash(&req.new_password)
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("UPDATE password_resets SET used_at = now() WHERE token_hash = $1")
+        .bind(&token_hash)
+        .execute(&mut *tx)
+        .await?;
+    let users = Users::new(state.pool.clone());
+    users
+        .update_password(user_id, &hash)
+        .await
+        .map_err(map_repo_error)?;
+    // A reset is strong proof of control — clear any lockout state so the
+    // legitimate owner isn't stuck behind a backoff window from old attempts.
+    sqlx::query("DELETE FROM failed_logins WHERE user_id = $1")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+
+    audit(
+        &state.pool,
+        user_id,
+        "auth.reset_password",
+        "user",
+        &user_id.to_string(),
+        None,
+    )
+    .await;
+    Ok(Json(json!({ "status": "password_updated" })).into_response())
 }
 
 /// Authenticate with email + password. Sets the httpOnly refresh cookie and

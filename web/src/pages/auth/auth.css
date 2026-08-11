@@ -50,6 +50,32 @@
   color: var(--color-text-muted);
 }
 
+.auth-card__forgot {
+  margin: 0;
+  text-align: right;
+  font: var(--type-body-sm);
+}
+
+.auth-card__forgot a {
+  color: var(--color-primary, #7b87f4);
+  text-decoration: none;
+}
+
+.auth-card__forgot a:hover {
+  text-decoration: underline;
+}
+
+.auth-card__success {
+  display: grid;
+  gap: var(--space-2);
+  font: var(--type-body-sm);
+}
+
+.auth-card__link {
+  color: var(--color-primary, #7b87f4);
+  text-decoration: none;
+}
+
 .auth-card__error {
   margin: 0;
   color: var(--color-danger);

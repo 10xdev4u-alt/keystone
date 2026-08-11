@@ -141,6 +141,35 @@ export function useVerifyEmail(
   });
 }
 
+export function useForgotPassword(
+  options?: UseMutationOptions<{ reset_token?: string }, ApiRequestError, { email: string }>,
+) {
+  return useMutation({
+    mutationFn: async (body) => {
+      const { data, error } = await client.POST("/api/v1/auth/forgot-password", { body });
+      if (error) throw error;
+      return data ?? {};
+    },
+    ...options,
+  });
+}
+
+export function useResetPassword(
+  options?: UseMutationOptions<void, ApiRequestError, {
+    email: string;
+    token: string;
+    new_password: string;
+  }>,
+) {
+  return useMutation({
+    mutationFn: async (body) => {
+      const { error } = await client.POST("/api/v1/auth/reset-password", { body });
+      if (error) throw error;
+    },
+    ...options,
+  });
+}
+
 export function useLogout(options?: UseMutationOptions<void, ApiRequestError, void>) {
   const qc = useQueryClient();
   const { onSuccess: userOnSuccess, ...rest } = options ?? {};

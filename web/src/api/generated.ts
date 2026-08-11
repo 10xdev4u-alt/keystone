@@ -76,6 +76,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/forgot-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a password reset. Same anti-enumeration posture as login: the
+         *     response is identical whether or not the account exists. In dev the raw
+         *     token is returned (mailer milestone emails it); only the hash is stored.
+         */
+        post: operations["forgot_password"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -164,6 +185,26 @@ export interface paths {
          *     (dev flow: the raw token is returned; the mailer milestone emails it).
          */
         post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete a password reset: validates the token, then swaps the hash and
+         *     burns the token atomically. Locked accounts are unlocked on success.
+         */
+        post: operations["reset_password"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2334,6 +2375,9 @@ export interface components {
             /** Format: int32 */
             rating: number;
         };
+        ForgotPasswordRequest: {
+            email: string;
+        };
         LessonRequest: {
             content: string;
             /** Format: int32 */
@@ -2536,6 +2580,11 @@ export interface components {
             limit?: number;
             /** Format: int64 */
             offset?: number;
+        };
+        ResetPasswordRequest: {
+            email: string;
+            new_password: string;
+            token: string;
         };
         ResolveReportRequest: {
             resolution_note?: string | null;
@@ -2848,6 +2897,28 @@ export interface operations {
             };
         };
     };
+    forgot_password: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForgotPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Reset token issued (dev: returned in body) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     login: {
         parameters: {
             query?: never;
@@ -2982,6 +3053,35 @@ export interface operations {
             };
             /** @description Email or username already registered */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reset_password: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Password updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid or expired token / weak password */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

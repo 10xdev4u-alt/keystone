@@ -56,6 +56,10 @@ export function LoginPage() {
 
         {error && <ErrorState title="Sign-in failed" message={error} />}
 
+        <p className="auth-card__forgot">
+          <Link to="/forgot-password">Forgot password?</Link>
+        </p>
+
         <Button type="submit" loading={login.isPending} className="auth-card__submit">
           {login.isPending ? "Signing in…" : "Sign in"}
         </Button>

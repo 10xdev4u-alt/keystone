@@ -5,11 +5,15 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LoginPage } from "./LoginPage";
 import { RegisterPage } from "./RegisterPage";
+import { ForgotPasswordPage } from "./ForgotPasswordPage";
+import { ResetPasswordPage } from "./ResetPasswordPage";
 
 // Top-level hoisted mock: the auth screens only call the mutation fn and read
 // isPending/error, so a controllable stub is enough for unit tests.
 const loginMutate = vi.hoisted(() => vi.fn());
 const registerMutate = vi.hoisted(() => vi.fn());
+const forgotMutate = vi.hoisted(() => vi.fn());
+const resetMutate = vi.hoisted(() => vi.fn());
 
 vi.mock("../../api/hooks", () => ({
   useLogin: () => ({
@@ -23,6 +27,16 @@ vi.mock("../../api/hooks", () => ({
     error: null,
   }),
   useVerifyEmail: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useForgotPassword: () => ({
+    mutate: forgotMutate,
+    isPending: false,
+    error: null,
+  }),
+  useResetPassword: () => ({
+    mutate: resetMutate,
+    isPending: false,
+    error: null,
+  }),
   useCurrentUser: () => ({ data: undefined, isPending: false, error: null }),
   usePosts: () => ({ data: undefined, isPending: false, error: null }),
   usePost: () => ({ data: undefined, isPending: false, error: null }),
@@ -49,6 +63,8 @@ function renderPage(node: React.ReactNode) {
 beforeEach(() => {
   loginMutate.mockReset();
   registerMutate.mockReset();
+  forgotMutate.mockReset();
+  resetMutate.mockReset();
 });
 
 afterEach(() => {
@@ -120,5 +136,46 @@ describe("RegisterPage", () => {
       },
       expect.anything(),
     );
+  });
+});
+
+describe("ForgotPasswordPage", () => {
+  it("submits the email and shows the sent state", async () => {
+    forgotMutate.mockImplementation((_args, opts) => opts?.onSuccess?.());
+    renderPage(<ForgotPasswordPage />);
+    await userEvent.type(screen.getByLabelText("Email"), "ada@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "Send reset link" }));
+    expect(forgotMutate).toHaveBeenCalledWith(
+      { email: "ada@example.com" },
+      expect.anything(),
+    );
+    expect(screen.getByText(/reset token is on the way/i)).toBeInTheDocument();
+  });
+});
+
+describe("ResetPasswordPage", () => {
+  it("submits matching passwords with the token", async () => {
+    renderPage(<ResetPasswordPage />);
+    await userEvent.type(screen.getByLabelText("Email"), "ada@example.com");
+    await userEvent.type(screen.getByLabelText("New password"), "newpass123");
+    await userEvent.type(screen.getByLabelText("Confirm new password"), "newpass123");
+    await userEvent.click(screen.getByRole("button", { name: "Set new password" }));
+    expect(resetMutate).toHaveBeenCalledWith({
+      email: "ada@example.com",
+      token: "",
+      new_password: "newpass123",
+    });
+  });
+
+  it("blocks submission when passwords mismatch", async () => {
+    renderPage(<ResetPasswordPage />);
+    await userEvent.type(screen.getByLabelText("Email"), "ada@example.com");
+    await userEvent.type(screen.getByLabelText("New password"), "newpass123");
+    await userEvent.type(screen.getByLabelText("Confirm new password"), "different");
+    expect(
+      screen.getByText(/passwords don't match/i),
+    ).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: "Set new password" });
+    expect(button).toBeDisabled();
   });
 });

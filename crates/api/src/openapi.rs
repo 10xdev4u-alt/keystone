@@ -23,6 +23,8 @@ use utoipa::{Modify, OpenApi};
     paths(
         crate::auth::register,
         crate::auth::verify_email,
+        crate::auth::forgot_password,
+        crate::auth::reset_password,
         crate::auth::login,
         crate::auth::refresh,
         crate::auth::logout,
@@ -175,6 +177,8 @@ use utoipa::{Modify, OpenApi};
     components(schemas(
         crate::auth::SignupRequest,
         crate::auth::VerifyEmailRequest,
+        crate::auth::ForgotPasswordRequest,
+        crate::auth::ResetPasswordRequest,
         crate::auth::LoginRequest,
         crate::auth::UserView,
         crate::auth::MeResponse,

@@ -71,6 +71,8 @@ pub fn router(state: AppState) -> Router {
         .merge(SwaggerUi::new("/swagger").url("/openapi.json", openapi::ApiDoc::openapi()))
         .route("/api/v1/auth/register", post(auth::register))
         .route("/api/v1/auth/verify-email", post(auth::verify_email))
+        .route("/api/v1/auth/forgot-password", post(auth::forgot_password))
+        .route("/api/v1/auth/reset-password", post(auth::reset_password))
         .route("/api/v1/auth/login", post(auth::login))
         .route_layer(axum_mw::from_fn_with_state(
             state.clone(),

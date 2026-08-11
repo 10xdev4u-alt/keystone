@@ -52,6 +52,12 @@ const RegisterPage = lazy(() =>
 const VerifyPage = lazy(() =>
   import("../pages/auth/VerifyPage").then((m) => ({ default: m.VerifyPage })),
 );
+const ForgotPasswordPage = lazy(() =>
+  import("../pages/auth/ForgotPasswordPage").then((m) => ({ default: m.ForgotPasswordPage })),
+);
+const ResetPasswordPage = lazy(() =>
+  import("../pages/auth/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage })),
+);
 
 function withSuspense(node: ReactNode): ReactNode {
   return (
@@ -90,6 +96,8 @@ export const routesConfig: RouteObject[] = [
       { path: "/login", element: withSuspense(<LoginPage />) },
       { path: "/register", element: withSuspense(<RegisterPage />) },
       { path: "/verify", element: withSuspense(<VerifyPage />) },
+      { path: "/forgot-password", element: withSuspense(<ForgotPasswordPage />) },
+      { path: "/reset-password", element: withSuspense(<ResetPasswordPage />) },
       { path: "*", element: <NotFound /> },
     ],
   },

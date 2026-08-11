@@ -219,6 +219,30 @@
         ]
       }
     },
+    "/api/v1/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Start a password reset. Same anti-enumeration posture as login: the\nresponse is identical whether or not the account exists. In dev the raw\ntoken is returned (mailer milestone emails it); only the hash is stored.",
+        "operationId": "forgot_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Reset token issued (dev: returned in body)"
+          }
+        }
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "tags": [
@@ -353,6 +377,33 @@
           },
           "409": {
             "description": "Email or username already registered"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/reset-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Complete a password reset: validates the token, then swaps the hash and\nburns the token atomically. Locked accounts are unlocked on success.",
+        "operationId": "reset_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Password updated"
+          },
+          "400": {
+            "description": "Invalid or expired token / weak password"
           }
         }
       }
@@ -6438,6 +6489,17 @@
           }
         }
       },
+      "ForgotPasswordRequest": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          }
+        }
+      },
       "LessonRequest": {
         "type": "object",
         "required": [
@@ -7132,6 +7194,25 @@
           "offset": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "token",
+          "new_password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "new_password": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
           }
         }
       },
