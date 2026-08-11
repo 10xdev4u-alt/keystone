@@ -35,6 +35,7 @@ type SearchResponse = components["schemas"]["SearchResponse"];
 type ProfileResponse = components["schemas"]["ProfileResponse"];
 type ProfileView = components["schemas"]["ProfileView"];
 type SetProfileRequest = components["schemas"]["SetProfileRequest"];
+type SessionListResponse = components["schemas"]["SessionListResponse"];
 type AdminStatusResponse = components["schemas"]["AdminStatusResponse"];
 type AdminUserList = components["schemas"]["AdminUserList"];
 type ReportQueueResponse = components["schemas"]["ReportQueueResponse"];
@@ -187,6 +188,60 @@ export function useLogout(options?: UseMutationOptions<void, ApiRequestError, vo
     onSuccess: (data, vars, ctx, mutation) => {
       qc.clear();
       userOnSuccess?.(data, vars, ctx, mutation);
+    },
+  });
+}
+
+/** The current user's live sessions; the one holding this browser's refresh
+ * cookie is marked `current`. */
+export function useSessions(options?: QueryOptions<SessionListResponse>) {
+  return useQuery({
+    queryKey: ["auth", "sessions"],
+    queryFn: async () => {
+      const { data, error } = await client.GET("/api/v1/auth/sessions");
+      if (error) throw error;
+      if (!data) throw new Error("Empty sessions response");
+      return data;
+    },
+    ...options,
+  });
+}
+
+/** Revoke one session (its refresh-cookie family dies with it). */
+export function useRevokeSession(
+  options?: UseMutationOptions<void, ApiRequestError, string>,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    ...options,
+    mutationFn: async (id) => {
+      const { error } = await client.DELETE("/api/v1/auth/sessions/{id}", {
+        params: { path: { id } },
+      });
+      if (error) throw error;
+    },
+    onSuccess: (data, vars, ctx, mutation) => {
+      qc.invalidateQueries({ queryKey: ["auth", "sessions"] });
+      options?.onSuccess?.(data, vars, ctx, mutation);
+    },
+  });
+}
+
+/** Revoke every live session for the current user — signs out every device. */
+export function useRevokeAllSessions(
+  options?: UseMutationOptions<void, ApiRequestError, void>,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    ...options,
+    mutationFn: async () => {
+      const { error } = await client.DELETE("/api/v1/auth/sessions");
+      if (error) throw error;
+    },
+    onSuccess: (data, vars, ctx, mutation) => {
+      qc.clear();
+      setTokens(null, null);
+      options?.onSuccess?.(data, vars, ctx, mutation);
     },
   });
 }

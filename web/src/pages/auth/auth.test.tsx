@@ -96,6 +96,14 @@ describe("LoginPage", () => {
       password: "hunter2secret",
     });
   });
+
+  it("links to the Google OAuth start route", () => {
+    renderPage(<LoginPage />);
+    expect(screen.getByRole("link", { name: "Continue with Google" })).toHaveAttribute(
+      "href",
+      "/api/v1/auth/oauth/google/start",
+    );
+  });
 });
 
 describe("RegisterPage", () => {
@@ -135,6 +143,14 @@ describe("RegisterPage", () => {
         last_name: "Lovelace",
       },
       expect.anything(),
+    );
+  });
+
+  it("links to the Google OAuth start route", () => {
+    renderPage(<RegisterPage />);
+    expect(screen.getByRole("link", { name: "Continue with Google" })).toHaveAttribute(
+      "href",
+      "/api/v1/auth/oauth/google/start",
     );
   });
 });

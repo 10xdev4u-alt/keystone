@@ -90,6 +90,7 @@ export const appNav: NavItem[] = [
   { label: "Messages", path: "/me/conversations", icon: ChatIcon },
   { label: "Files", path: "/me/files", icon: PostIcon },
   { label: "Profile", path: "/me/profile", icon: UserIcon },
+  { label: "Sessions", path: "/me/sessions", icon: ShieldIcon },
 ];
 
 /** Staff-only admin shell nav. */
