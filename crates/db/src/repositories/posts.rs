@@ -198,6 +198,38 @@ impl Posts {
         Ok(rows)
     }
 
+    /// Lock a discussion: new comments are refused by callers while
+    /// `locked_at` is set. Answers whether a live post was locked.
+    pub async fn lock(&self, id: Uuid) -> Result<bool, RepoError> {
+        let result =
+            sqlx::query("UPDATE posts SET locked_at = now() WHERE id = $1 AND deleted_at IS NULL")
+                .bind(id)
+                .execute(&self.pool)
+                .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    /// Unlock a discussion. Answers whether a live post was unlocked.
+    pub async fn unlock(&self, id: Uuid) -> Result<bool, RepoError> {
+        let result =
+            sqlx::query("UPDATE posts SET locked_at = NULL WHERE id = $1 AND deleted_at IS NULL")
+                .bind(id)
+                .execute(&self.pool)
+                .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    /// Whether the post is currently locked for new comments.
+    pub async fn is_locked(&self, id: Uuid) -> Result<bool, RepoError> {
+        let locked = sqlx::query_scalar::<_, Option<chrono::DateTime<chrono::Utc>>>(
+            "SELECT locked_at FROM posts WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(locked.flatten().is_some())
+    }
+
     /// Soft delete: `deleted_at` + status flip. Hard deletes are not exposed.
     pub async fn soft_delete(&self, id: Uuid) -> Result<Option<()>, RepoError> {
         let result = sqlx::query(
