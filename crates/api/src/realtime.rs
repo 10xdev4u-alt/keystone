@@ -174,7 +174,10 @@ pub async fn notifications_feed(
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.trim().parse::<i64>().ok());
 
-    // DB replay (ascending id order, exactly the missed range).
+    // Subscribe BEFORE the DB query so nothing published between the query
+    // and the subscription is lost; the live stream dedups against the
+    // highest replayed id (the replay is strictly ascending).
+    let rx = state.realtime.subscribe_feed(user.user_id);
     let repo = Notifications::new(state.pool.clone());
     let replay = match last_id {
         Some(after) => repo
@@ -183,6 +186,7 @@ pub async fn notifications_feed(
             .unwrap_or_default(),
         None => Vec::new(),
     };
+    let watermark = replay.last().map(|n| n.id).unwrap_or(last_id.unwrap_or(0));
     let replay_stream = stream::iter(replay).map(|n| {
         Ok::<_, Infallible>(
             SseEvent::default()
@@ -193,30 +197,38 @@ pub async fn notifications_feed(
         )
     });
 
-    let rx = state.realtime.subscribe_feed(user.user_id);
-    let live_stream = stream::unfold(rx, |mut rx| async move {
-        match rx.recv().await {
-            Ok(event) => Some((
-                Ok::<_, Infallible>(
-                    SseEvent::default()
-                        .id(event.id.to_string())
-                        .event(event.kind.clone())
-                        .json_data(event.payload.clone())
-                        .expect("payload must serialize"),
-                ),
-                rx,
-            )),
-            // Overrun: tell the client to reconnect with Last-Event-ID so it
-            // replays the gap from the database — never silently drop.
-            Err(broadcast::error::RecvError::Lagged(_)) => Some((
-                Ok::<_, Infallible>(
-                    SseEvent::default()
-                        .event("resync")
-                        .data("replay-from-last-event-id"),
-                ),
-                rx,
-            )),
-            Err(broadcast::error::RecvError::Closed) => None,
+    let live_stream = stream::unfold((rx, watermark), |(mut rx, mut watermark)| async move {
+        loop {
+            match rx.recv().await {
+                Ok(event) if event.id > watermark => {
+                    watermark = event.id;
+                    return Some((
+                        Ok::<_, Infallible>(
+                            SseEvent::default()
+                                .id(event.id.to_string())
+                                .event(event.kind.clone())
+                                .json_data(event.payload.clone())
+                                .expect("payload must serialize"),
+                        ),
+                        (rx, watermark),
+                    ));
+                }
+                // Already delivered in the replay — skip, don't duplicate.
+                Ok(_) => continue,
+                // Overrun: tell the client to reconnect with Last-Event-ID so
+                // it replays the gap from the database — never silently drop.
+                Err(broadcast::error::RecvError::Lagged(_)) => {
+                    return Some((
+                        Ok::<_, Infallible>(
+                            SseEvent::default()
+                                .event("resync")
+                                .data("replay-from-last-event-id"),
+                        ),
+                        (rx, watermark),
+                    ));
+                }
+                Err(broadcast::error::RecvError::Closed) => return None,
+            }
         }
     });
 
