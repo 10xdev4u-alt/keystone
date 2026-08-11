@@ -18,6 +18,9 @@ const Placeholder = lazy(() =>
 const MyFeedPage = lazy(() =>
   import("../pages/MyFeedPage").then((m) => ({ default: m.MyFeedPage })),
 );
+const NotificationsPage = lazy(() =>
+  import("../pages/NotificationsPage").then((m) => ({ default: m.NotificationsPage })),
+);
 
 const HomePage = lazy(() =>
   import("../pages/HomePage").then((m) => ({ default: m.HomePage })),
@@ -124,7 +127,7 @@ export const routesConfig: RouteObject[] = [
     errorElement: <RouteErrorBoundary />,
     children: [
       { path: "/me", element: withSuspense(<MyFeedPage />) },
-      { path: "/me/notifications", element: withSuspense(<Placeholder title="Notifications" />) },
+      { path: "/me/notifications", element: withSuspense(<NotificationsPage />) },
       { path: "/me/conversations", element: withSuspense(<Placeholder title="Messages" />) },
       { path: "/me/files", element: withSuspense(<Placeholder title="My files" />) },
       { path: "/me/profile", element: withSuspense(<Placeholder title="Profile" />) },

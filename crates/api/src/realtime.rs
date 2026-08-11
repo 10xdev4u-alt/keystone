@@ -29,7 +29,7 @@ use axum::Json;
 use futures::stream::{self, StreamExt};
 use keystone_db::repositories::notifications::{Notifications, PreferenceUpdate};
 use serde::Deserialize;
-use serde_json::{json, Value as JsonValue};
+use serde_json::Value as JsonValue;
 use sqlx::PgPool;
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -266,7 +266,7 @@ pub struct ListQuery {
     get,
     path = "/api/v1/notifications",
     responses(
-        (status = 200, description = "Notifications", body = Value),
+        (status = 200, description = "Notifications", body = NotificationListResponse),
         (status = 401, description = "Missing or invalid access token"),
     ),
     security(("bearer_auth" = [])),
@@ -276,7 +276,7 @@ pub async fn list_notifications(
     State(state): State<AppState>,
     user: AuthUser,
     Query(q): Query<ListQuery>,
-) -> Result<Json<JsonValue>, ApiError> {
+) -> Result<Json<NotificationListResponse>, ApiError> {
     let repo = Notifications::new(state.pool.clone());
     let items = repo
         .list(user.user_id, q.before, q.limit.unwrap_or(20))
@@ -299,24 +299,24 @@ pub async fn list_notifications(
         .unread_count(user.user_id)
         .await
         .map_err(map_repo_error)?;
-    let items: Vec<JsonValue> = items
+    let items: Vec<NotificationView> = items
         .into_iter()
-        .map(|n| {
-            json!({
-                "id": n.id,
-                "kind": n.kind,
-                "actor_id": n.actor_id.map(|a| a.to_string()),
-                "entity_type": n.entity_type,
-                "entity_id": n.entity_id.map(|e| e.to_string()),
-                "payload": n.payload,
-                "created_at": n.created_at,
-                "is_read": n.id <= cursor,
-            })
+        .map(|n| NotificationView {
+            id: n.id,
+            kind: n.kind,
+            actor_id: n.actor_id.map(|a| a.to_string()),
+            entity_type: n.entity_type,
+            entity_id: n.entity_id.map(|e| e.to_string()),
+            payload: n.payload,
+            created_at: n.created_at.to_rfc3339(),
+            is_read: n.id <= cursor,
         })
         .collect();
-    Ok(Json(
-        json!({ "notifications": items, "unread": unread, "read_cursor": cursor }),
-    ))
+    Ok(Json(NotificationListResponse {
+        notifications: items,
+        unread,
+        read_cursor: cursor,
+    }))
 }
 
 /// The caller's unread notification count.
@@ -324,7 +324,7 @@ pub async fn list_notifications(
     get,
     path = "/api/v1/notifications/unread-count",
     responses(
-        (status = 200, description = "Unread count", body = Value),
+        (status = 200, description = "Unread count", body = UnreadCountResponse),
         (status = 401, description = "Missing or invalid access token"),
     ),
     security(("bearer_auth" = [])),
@@ -333,13 +333,13 @@ pub async fn list_notifications(
 pub async fn unread_count(
     State(state): State<AppState>,
     user: AuthUser,
-) -> Result<Json<JsonValue>, ApiError> {
+) -> Result<Json<UnreadCountResponse>, ApiError> {
     let repo = Notifications::new(state.pool.clone());
     let count = repo
         .unread_count(user.user_id)
         .await
         .map_err(map_repo_error)?;
-    Ok(Json(json!({ "unread": count })))
+    Ok(Json(UnreadCountResponse { unread: count }))
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -355,7 +355,7 @@ pub struct MarkReadRequest {
     operation_id = "notifications_mark_read",
     request_body = MarkReadRequest,
     responses(
-        (status = 200, description = "Updated unread state", body = Value),
+        (status = 200, description = "Updated unread state", body = ReadReceiptResponse),
         (status = 401, description = "Missing or invalid access token"),
     ),
     security(("bearer_auth" = [])),
@@ -365,7 +365,7 @@ pub async fn mark_read(
     State(state): State<AppState>,
     user: AuthUser,
     Json(req): Json<MarkReadRequest>,
-) -> Result<Json<JsonValue>, ApiError> {
+) -> Result<Json<ReadReceiptResponse>, ApiError> {
     let repo = Notifications::new(state.pool.clone());
     let cursor = match req.up_to {
         Some(id) => {
@@ -383,7 +383,16 @@ pub async fn mark_read(
         .unread_count(user.user_id)
         .await
         .map_err(map_repo_error)?;
-    Ok(Json(json!({ "read_cursor": cursor, "unread": unread })))
+    Ok(Json(ReadReceiptResponse {
+        read_cursor: cursor,
+        unread,
+    }))
+}
+
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct ReadReceiptResponse {
+    pub read_cursor: i64,
+    pub unread: i64,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -394,6 +403,32 @@ pub struct PreferencesRequest {
     pub muted_kinds: Option<Vec<String>>,
     pub quiet_hours_start: Option<i16>,
     pub quiet_hours_end: Option<i16>,
+}
+
+/// A single notification in the feed, with read state derived from the
+/// per-user cursor (items at or below the cursor are read).
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct NotificationView {
+    pub id: i64,
+    pub kind: String,
+    pub actor_id: Option<String>,
+    pub entity_type: String,
+    pub entity_id: Option<String>,
+    pub payload: JsonValue,
+    pub created_at: String,
+    pub is_read: bool,
+}
+
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct NotificationListResponse {
+    pub notifications: Vec<NotificationView>,
+    pub unread: i64,
+    pub read_cursor: i64,
+}
+
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct UnreadCountResponse {
+    pub unread: i64,
 }
 
 /// The caller's notification preferences — the typed contract for both the

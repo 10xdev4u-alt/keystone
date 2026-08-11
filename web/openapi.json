@@ -3317,7 +3317,9 @@
             "description": "Notifications",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationListResponse"
+                }
               }
             }
           },
@@ -3446,7 +3448,9 @@
             "description": "Updated unread state",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ReadReceiptResponse"
+                }
               }
             }
           },
@@ -3473,7 +3477,9 @@
             "description": "Unread count",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadCountResponse"
+                }
               }
             }
           },
@@ -7026,6 +7032,30 @@
           }
         }
       },
+      "NotificationListResponse": {
+        "type": "object",
+        "required": [
+          "notifications",
+          "unread",
+          "read_cursor"
+        ],
+        "properties": {
+          "notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationView"
+            }
+          },
+          "read_cursor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unread": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "NotificationPreferencesView": {
         "type": "object",
         "description": "The caller's notification preferences — the typed contract for both the\nGET and PUT handlers (kills the previous `Value`-shaped responses).",
@@ -7064,6 +7094,51 @@
               "null"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "NotificationView": {
+        "type": "object",
+        "description": "A single notification in the feed, with read state derived from the\nper-user cursor (items at or below the cursor are read).",
+        "required": [
+          "id",
+          "kind",
+          "entity_type",
+          "payload",
+          "created_at",
+          "is_read"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "entity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entity_type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "is_read": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/Value"
           }
         }
       },
@@ -7521,6 +7596,23 @@
           },
           "prompt": {
             "type": "string"
+          }
+        }
+      },
+      "ReadReceiptResponse": {
+        "type": "object",
+        "required": [
+          "read_cursor",
+          "unread"
+        ],
+        "properties": {
+          "read_cursor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unread": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -8114,6 +8206,18 @@
           }
         }
       },
+      "UnreadCountResponse": {
+        "type": "object",
+        "required": [
+          "unread"
+        ],
+        "properties": {
+          "unread": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "UpdatePostRequest": {
         "type": "object",
         "required": [
@@ -8224,6 +8328,7 @@
           }
         }
       },
+      "Value": {},
       "VendorRequest": {
         "type": "object",
         "required": [

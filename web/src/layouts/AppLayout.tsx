@@ -1,4 +1,5 @@
 import { Link, Outlet, useNavigate } from "react-router-dom";
+import { useUnreadCount } from "../api/hooks";
 import { OfflineIndicator } from "../components/OfflineIndicator/OfflineIndicator";
 import { Avatar } from "../components/Avatar/Avatar";
 import { Button } from "../components/Button/Button";
@@ -12,6 +13,12 @@ import "./shell.css";
  */
 export function AppLayout() {
   const navigate = useNavigate();
+  const { data: unread } = useUnreadCount({ retry: false });
+  const nav = appNav.map((item) =>
+    item.path === "/me/notifications" && unread?.unread
+      ? { ...item, badge: unread.unread }
+      : item,
+  );
   return (
     <div className="shell shell--app">
       <OfflineIndicator />
@@ -20,7 +27,7 @@ export function AppLayout() {
           <span className="shell__logo" aria-hidden="true">K</span>
           <span className="shell__brand-name">Keystone</span>
         </Link>
-        <ShellNav items={appNav} />
+        <ShellNav items={nav} />
         <div className="shell__sidebar-footer">
           <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
             Back to public site

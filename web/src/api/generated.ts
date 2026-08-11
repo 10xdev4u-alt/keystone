@@ -2552,6 +2552,13 @@ export interface components {
             position: number;
             title: string;
         };
+        NotificationListResponse: {
+            notifications: components["schemas"]["NotificationView"][];
+            /** Format: int64 */
+            read_cursor: number;
+            /** Format: int64 */
+            unread: number;
+        };
         /**
          * @description The caller's notification preferences — the typed contract for both the
          *     GET and PUT handlers (kills the previous `Value`-shaped responses).
@@ -2565,6 +2572,21 @@ export interface components {
             quiet_hours_end?: number | null;
             /** Format: int32 */
             quiet_hours_start?: number | null;
+        };
+        /**
+         * @description A single notification in the feed, with read state derived from the
+         *     per-user cursor (items at or below the cursor are read).
+         */
+        NotificationView: {
+            actor_id?: string | null;
+            created_at: string;
+            entity_id?: string | null;
+            entity_type: string;
+            /** Format: int64 */
+            id: number;
+            is_read: boolean;
+            kind: string;
+            payload: components["schemas"]["Value"];
         };
         /** @description Single-organization detail response. */
         OrgDetailResponse: {
@@ -2694,6 +2716,12 @@ export interface components {
             /** Format: int32 */
             position: number;
             prompt: string;
+        };
+        ReadReceiptResponse: {
+            /** Format: int64 */
+            read_cursor: number;
+            /** Format: int64 */
+            unread: number;
         };
         RegisterRequest: {
             content_type: string;
@@ -2868,6 +2896,10 @@ export interface components {
             token_type: string;
             user: components["schemas"]["UserView"];
         };
+        UnreadCountResponse: {
+            /** Format: int64 */
+            unread: number;
+        };
         UpdatePostRequest: {
             body: string;
             change_note?: string | null;
@@ -2893,6 +2925,7 @@ export interface components {
             status: string;
             username?: string | null;
         };
+        Value: unknown;
         VendorRequest: {
             category: string;
             description?: string | null;
@@ -5722,7 +5755,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["NotificationListResponse"];
                 };
             };
             /** @description Missing or invalid access token */
@@ -5838,7 +5871,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ReadReceiptResponse"];
                 };
             };
             /** @description Missing or invalid access token */
@@ -5865,7 +5898,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["UnreadCountResponse"];
                 };
             };
             /** @description Missing or invalid access token */

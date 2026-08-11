@@ -10,6 +10,15 @@ import { RouteErrorBoundary } from "./ErrorBoundary";
 // assert routing, not data fetching.
 vi.mock("../api/hooks", () => ({
   useCurrentUser: vi.fn(() => ({ data: undefined, isPending: false, error: null })),
+  useUnreadCount: vi.fn(() => ({ data: { unread: 0 }, isLoading: false, isError: false })),
+  useNotifications: vi.fn(() => ({
+    data: { notifications: [], unread: 0, read_cursor: 0 },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+  useMarkNotificationsRead: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useLogout: vi.fn(() => ({ mutate: vi.fn(), isPending: false, error: null })),
   usePosts: vi.fn(() => ({
     data: { posts: [], limit: 20, next_cursor: null },
