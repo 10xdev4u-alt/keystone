@@ -2118,6 +2118,13 @@ export interface components {
             /** Format: uuid */
             answer_id: string;
         };
+        CareerAssessmentRequest: {
+            /** Format: uuid */
+            career_path_id: string;
+            notes?: string | null;
+            /** Format: int32 */
+            score: number;
+        };
         CareerPathRequest: {
             description?: string | null;
             title: string;
@@ -2373,6 +2380,13 @@ export interface components {
         };
         SetRoleRequest: {
             role: string;
+        };
+        SignupRequest: {
+            email: string;
+            first_name?: string | null;
+            last_name?: string | null;
+            password: string;
+            username?: string | null;
         };
         SkillRequest: {
             level: string;
@@ -2721,7 +2735,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RegisterRequest"];
+                "application/json": components["schemas"]["SignupRequest"];
             };
         };
         responses: {
@@ -4410,7 +4424,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AssessmentRequest"];
+                "application/json": components["schemas"]["CareerAssessmentRequest"];
             };
         };
         responses: {

@@ -331,7 +331,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RegisterRequest"
+                "$ref": "#/components/schemas/SignupRequest"
               }
             }
           },
@@ -2352,7 +2352,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AssessmentRequest"
+                "$ref": "#/components/schemas/CareerAssessmentRequest"
               }
             }
           },
@@ -5617,6 +5617,29 @@
           }
         }
       },
+      "CareerAssessmentRequest": {
+        "type": "object",
+        "required": [
+          "career_path_id",
+          "score"
+        ],
+        "properties": {
+          "career_path_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "score": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "CareerPathRequest": {
         "type": "object",
         "required": [
@@ -6505,6 +6528,39 @@
         "properties": {
           "role": {
             "type": "string"
+          }
+        }
+      },
+      "SignupRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "first_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "password": {
+            "type": "string"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
