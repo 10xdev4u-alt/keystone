@@ -23,7 +23,11 @@ use axum::response::{IntoResponse, Response};
 /// Single constant for the CSRF cookie (same discipline as REFRESH_COOKIE).
 pub const CSRF_COOKIE: &str = "keystone_csrf";
 pub const CSRF_HEADER: &str = "x-csrf-token";
-const CSRF_COOKIE_PATH: &str = "/api/v1/auth";
+// Root path: the cookie must be readable via document.cookie from ANY SPA
+// route (and sent on any request) so the SPA can always echo it back.
+// Scoping it to /api/v1/auth made it invisible to JS at "/" — sessions could
+// never be recovered after a page reload.
+const CSRF_COOKIE_PATH: &str = "/";
 
 /// Build the CSRF cookie value header. NOT httpOnly — the SPA must read it to
 /// echo it back; it is not a credential (the refresh token is).
