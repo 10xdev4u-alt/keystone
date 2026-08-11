@@ -37,6 +37,15 @@ pub struct PostWithCounts {
     pub bookmark_count: i64,
 }
 
+/// One page of the feed. The cursor is the `(created_at, id)` of the last
+/// returned row — pass it as `before` for the next page. Keyset pagination
+/// is O(page) and stable under concurrent inserts (OFFSET skips duplicates).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PostPage {
+    pub posts: Vec<PostWithCounts>,
+    pub next_cursor: Option<(DateTime<Utc>, Uuid)>,
+}
+
 /// One row of real version history.
 #[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
 pub struct PostVersion {
@@ -162,13 +171,18 @@ impl Posts {
     }
 
     /// Published posts, newest first, with derived counters.
+    ///
+    /// Keyset pagination: pass the previous page's `next_cursor` as `before`
+    /// to fetch strictly older rows. `limit + 1` rows are fetched so the page
+    /// knows whether more exist. The `(created_at, id)` tuple ordering makes
+    /// the sort total — no two posts share the same cursor position.
     pub async fn list(
         &self,
         kind: Option<&str>,
         author_id: Option<Uuid>,
         limit: i64,
-        offset: i64,
-    ) -> Result<Vec<PostWithCounts>, RepoError> {
+        before: Option<(DateTime<Utc>, Uuid)>,
+    ) -> Result<PostPage, RepoError> {
         let mut sql = String::from(
             r#"
             SELECT p.id, p.author_id, p.kind, p.title, p.slug, p.body, p.summary,
@@ -180,22 +194,48 @@ impl Posts {
             WHERE p.deleted_at IS NULL AND p.status = 'published'
             "#,
         );
+        let mut next = 1usize;
         if kind.is_some() {
-            sql.push_str(" AND p.kind = $1");
+            sql.push_str(&format!(" AND p.kind = ${next}"));
+            next += 1;
         }
         if author_id.is_some() {
-            sql.push_str(" AND p.author_id = $2");
+            sql.push_str(&format!(" AND p.author_id = ${next}"));
+            next += 1;
         }
-        sql.push_str(" ORDER BY p.created_at DESC LIMIT $3 OFFSET $4");
+        if before.is_some() {
+            sql.push_str(&format!(
+                " AND (p.created_at, p.id) < (${next}, ${})",
+                next + 1
+            ));
+            next += 2;
+        }
+        sql.push_str(&format!(
+            " ORDER BY p.created_at DESC, p.id DESC LIMIT ${next}"
+        ));
 
-        let rows = sqlx::query_as::<_, PostWithCounts>(&sql)
-            .bind(kind)
-            .bind(author_id)
-            .bind(limit)
-            .bind(offset)
-            .fetch_all(&self.pool)
-            .await?;
-        Ok(rows)
+        let mut query = sqlx::query_as::<_, PostWithCounts>(&sql);
+        if let Some(k) = kind {
+            query = query.bind(k);
+        }
+        if let Some(a) = author_id {
+            query = query.bind(a);
+        }
+        if let Some((ts, id)) = before {
+            query = query.bind(ts).bind(id);
+        }
+        let mut rows = query.bind(limit + 1).fetch_all(&self.pool).await?;
+
+        let has_more = rows.len() > limit as usize;
+        rows.truncate(limit as usize);
+        let next_cursor = has_more.then(|| {
+            let last = rows.last().expect("has_more implies non-empty page");
+            (last.post.created_at, last.post.id)
+        });
+        Ok(PostPage {
+            posts: rows,
+            next_cursor,
+        })
     }
 
     /// Lock a discussion: new comments are refused by callers while
