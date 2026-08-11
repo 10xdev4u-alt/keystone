@@ -136,25 +136,6 @@ export function useLogout(options?: UseMutationOptions<void, ApiRequestError, vo
   });
 }
 
-// ── Content ─────────────────────────────────────────────────────────────────
-
-type ListPostsQuery = NonNullable<operations["list_posts"]["parameters"]["query"]>;
-
-export function usePosts(
-  query: ListPostsQuery = {},
-  options?: UseQueryOptions<unknown, ApiRequestError>,
-) {
-  return useQuery({
-    queryKey: ["posts", query],
-    queryFn: async () => {
-      const { data, error } = await client.GET("/api/v1/posts", { params: { query } });
-      if (error) throw error;
-      return data;
-    },
-    ...options,
-  });
-}
-
 export function usePost(
   id: string,
   options?: UseQueryOptions<unknown, ApiRequestError>,
