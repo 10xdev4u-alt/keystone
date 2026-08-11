@@ -13,7 +13,7 @@ architecture promises.
 | Realtime   | SSE (notifications) + WebSocket (chat) over Postgres `LISTEN/NOTIFY` |
 | Search     | Postgres full-text search (Elasticsearch pluggable behind a trait) |
 | Storage    | S3/MinIO via aws-sdk-rust (presigned uploads/downloads) |
-| Frontend   | React + Vite SPA, generated client from the OpenAPI spec (in progress) |
+| Frontend   | React + Vite SPA; typed client + TanStack Query hooks generated from the OpenAPI spec (`npm run gen:api`) |
 | CI/CD      | GitHub Actions: fmt, clippy `-D warnings`, tests, cargo audit |
 
 ## Repository layout

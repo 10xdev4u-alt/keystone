@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -92,6 +93,33 @@ jobs:
         run: npm run test
       - name: Production build
         run: npm run build
+
+  spec-client-gate:
+    name: OpenAPI spec → generated client in sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+      - name: Install web deps
+        working-directory: web
+        run: npm ci
+      - name: Regenerate client from spec
+        run: bash scripts/generate-client.sh
+      - name: Fail on uncommitted spec/client drift
+        run: |
+          if ! git diff --exit-code -- web/openapi.json web/src/api/generated.ts; then
+            echo "::error::The OpenAPI spec or generated TS client changed. Run 'npm run gen:api' and commit the result."
+            exit 1
+          fi
 
   security-grep:
     name: Secrets-in-logs guard

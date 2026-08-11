@@ -102,6 +102,62 @@ fn spec_exposes_content_social_qa_paths() {
 }
 
 #[test]
+fn spec_exposes_learning_realtime_files_moderation_paths() {
+    let doc = doc();
+    let paths = doc["paths"].as_object().expect("paths object");
+    for route in [
+        "/api/v1/courses",
+        "/api/v1/courses/{slug}",
+        "/api/v1/courses/{slug}/publish",
+        "/api/v1/courses/{slug}/enroll",
+        "/api/v1/courses/{slug}/modules",
+        "/api/v1/courses/{slug}/modules/{module_id}/lessons",
+        "/api/v1/courses/{slug}/lessons/{lesson_id}/complete",
+        "/api/v1/courses/{slug}/progress",
+        "/api/v1/me/certificates",
+        "/api/v1/courses/{slug}/assessments",
+        "/api/v1/courses/{slug}/assessments/{assessment_id}/questions",
+        "/api/v1/assessments/{id}",
+        "/api/v1/assessments/{id}/attempts",
+        "/api/v1/attempts/{id}/submit",
+        "/api/v1/me/credits",
+        "/api/v1/me/credits/redeem",
+        "/api/v1/me/credits/ledger",
+        "/api/v1/me/mentor-profile",
+        "/api/v1/mentors",
+        "/api/v1/users/{mentor_id}/mentorship",
+        "/api/v1/mentorship/{request_id}/accept",
+        "/api/v1/mentorship/{request_id}/decline",
+        "/api/v1/mentorship/{request_id}/sessions",
+        "/api/v1/sessions/{session_id}/feedback",
+        "/api/v1/events",
+        "/api/v1/events/{slug}",
+        "/api/v1/events/{slug}/register",
+        "/api/v1/events/{slug}/registration",
+        "/api/v1/events/{slug}/speakers/{speaker_id}",
+        "/api/v1/notifications",
+        "/api/v1/notifications/feed",
+        "/api/v1/notifications/unread-count",
+        "/api/v1/notifications/read",
+        "/api/v1/notifications/preferences",
+        "/api/v1/conversations",
+        "/api/v1/conversations/{id}/messages",
+        "/api/v1/conversations/{id}/read",
+        "/api/v1/conversations/{id}/presence",
+        "/api/v1/ws/chat/{id}",
+        "/api/v1/files/presign",
+        "/api/v1/files",
+        "/api/v1/files/{id}",
+        "/api/v1/reports",
+        "/api/v1/reviews",
+        "/api/v1/moderation/reports",
+        "/api/v1/moderation/reports/{id}/resolve",
+    ] {
+        assert!(paths.contains_key(route), "missing path {route}");
+    }
+}
+
+#[test]
 fn spec_tags_each_operation() {
     let doc = doc();
     let paths = doc["paths"].as_object().unwrap();
@@ -119,8 +175,8 @@ fn spec_tags_each_operation() {
         }
     }
     assert!(
-        tagged >= 75,
-        "expected >= 75 tagged operations, got {tagged}"
+        tagged >= 105,
+        "expected >= 105 tagged operations, got {tagged}"
     );
 }
 
