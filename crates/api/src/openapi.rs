@@ -191,6 +191,8 @@ use utoipa::{Modify, OpenApi};
         crate::content::PostQuery,
         crate::content::PostListPage,
         crate::content::ReviewQuery,
+        crate::social::CommunityView,
+        crate::social::CommunityList,
         crate::social::CreateCommunityRequest,
         crate::social::AddCommunityPostRequest,
         crate::social::SetMemberRoleRequest,

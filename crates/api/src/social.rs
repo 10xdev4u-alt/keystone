@@ -107,16 +107,35 @@ fn default_limit() -> i64 {
     20
 }
 
-fn community_view(c: &keystone_db::repositories::communities::Community) -> Value {
-    json!({
-        "id": c.id.to_string(),
-        "name": c.name,
-        "slug": c.slug,
-        "description": c.description,
-        "visibility": c.visibility,
-        "created_by": c.created_by.to_string(),
-        "created_at": c.created_at,
-    })
+/// Community card — the list and detail contract.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct CommunityView {
+    pub id: String,
+    pub name: String,
+    pub slug: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub visibility: String,
+    pub created_by: String,
+    pub created_at: String,
+}
+
+/// Paged communities response.
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct CommunityList {
+    pub communities: Vec<CommunityView>,
+}
+
+fn community_view(c: &keystone_db::repositories::communities::Community) -> CommunityView {
+    CommunityView {
+        id: c.id.to_string(),
+        name: c.name.clone(),
+        slug: c.slug.clone(),
+        description: c.description.clone(),
+        visibility: c.visibility.clone(),
+        created_by: c.created_by.to_string(),
+        created_at: c.created_at.to_rfc3339(),
+    }
 }
 
 // ── Communities ────────────────────────────────────────────────────────────
@@ -218,21 +237,21 @@ pub async fn get_community(
         ("offset" = Option<i64>, Query, description = "Page offset"),
     ),
     responses(
-        (status = 200, description = "Communities page", body = Value),
+        (status = 200, description = "Communities page", body = CommunityList),
     ),
     tag = "social"
 )]
 pub async fn list_communities(
     State(state): State<AppState>,
     Query(query): Query<PageQuery>,
-) -> ApiResult<Json<Value>> {
+) -> ApiResult<Json<CommunityList>> {
     let communities = Communities::new(state.pool.clone());
     let rows = communities
         .list(query.limit.clamp(1, 50), query.offset.max(0))
         .await
         .map_err(map_repo_error)?;
-    let items: Vec<Value> = rows.iter().map(community_view).collect();
-    Ok(Json(json!({ "communities": items })))
+    let items: Vec<CommunityView> = rows.iter().map(community_view).collect();
+    Ok(Json(CommunityList { communities: items }))
 }
 
 /// Join a community.

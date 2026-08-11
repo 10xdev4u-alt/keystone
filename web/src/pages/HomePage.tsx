@@ -25,7 +25,6 @@ function PostCard({
   id,
   kind,
   title,
-  slug,
   summary,
   viewCount,
   commentCount,
@@ -35,7 +34,6 @@ function PostCard({
   id: string;
   kind: string;
   title: string;
-  slug: string;
   summary?: string | null;
   viewCount: number;
   commentCount: number;
@@ -89,7 +87,7 @@ function FeedSkeleton() {
 /** The homepage — newest posts across every kind, keyset-paginated. */
 export function HomePage() {
   const [before, setBefore] = useState<string | undefined>(undefined);
-  const { data, isLoading, isError, error, isFetching } = usePosts(
+  const { data, isLoading, isError, error, isFetching, refetch } = usePosts(
     { limit: 20, before },
     { placeholderData: keepPreviousData },
   );
@@ -127,7 +125,6 @@ export function HomePage() {
                 id={post.id}
                 kind={post.kind}
                 title={post.title}
-                slug={post.slug}
                 summary={post.summary}
                 viewCount={post.view_count}
                 commentCount={post.comment_count}

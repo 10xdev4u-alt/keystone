@@ -23,13 +23,21 @@ type PostDetailResponse = components["schemas"]["PostDetailResponse"];
 type CommentList = components["schemas"]["CommentList"];
 type CommentResponse = components["schemas"]["CommentResponse"];
 type CreateCommentRequest = components["schemas"]["CreateCommentRequest"];
+type CommunityList = components["schemas"]["CommunityList"];
+
+/**
+ * Caller-facing options for query wrapper hooks. The hook owns `queryKey` and
+ * `queryFn`; callers may pass any other option (staleTime, enabled, select,
+ * placeholderData, …) without satisfying the queryKey field.
+ */
+type QueryOptions<T> = Omit<UseQueryOptions<T, ApiRequestError>, "queryKey" | "queryFn">;
 
 // ── Content ──────────────────────────────────────────────────────────────────
 
 /** The homepage feed — newest posts first, keyset-paginated. */
 export function usePosts(
   params: { kind?: string; limit?: number; before?: string } = {},
-  options?: UseQueryOptions<PostListPage, ApiRequestError>,
+  options?: QueryOptions<PostListPage>,
 ) {
   return useQuery({
     queryKey: ["posts", params],
@@ -48,7 +56,7 @@ export function usePosts(
 
 // ── Auth ────────────────────────────────────────────────────────────────────
 
-export function useCurrentUser(options?: UseQueryOptions<UserView, ApiRequestError>) {
+export function useCurrentUser(options?: QueryOptions<UserView>) {
   return useQuery({
     queryKey: ["auth", "me"],
     queryFn: async () => {
@@ -143,7 +151,7 @@ export function useLogout(options?: UseMutationOptions<void, ApiRequestError, vo
 /** Full post reader view — slug or UUID. */
 export function usePost(
   id: string,
-  options?: UseQueryOptions<PostDetailResponse, ApiRequestError>,
+  options?: QueryOptions<PostDetailResponse>,
 ) {
   return useQuery({
     queryKey: ["posts", id],
@@ -164,7 +172,7 @@ export function usePost(
 /** Comment thread for a post. */
 export function useComments(
   postId: string,
-  options?: UseQueryOptions<CommentList, ApiRequestError>,
+  options?: QueryOptions<CommentList>,
 ) {
   return useQuery({
     queryKey: ["comments", postId],
@@ -209,7 +217,7 @@ export function useCreateComment(
 
 export function useCommunities(
   query: operations["list_communities"]["parameters"]["query"] = {},
-  options?: UseQueryOptions<unknown, ApiRequestError>,
+  options?: QueryOptions<CommunityList>,
 ) {
   return useQuery({
     queryKey: ["communities", query],
@@ -218,8 +226,10 @@ export function useCommunities(
         params: { query },
       });
       if (error) throw error;
+      if (!data) throw new Error("Empty communities response");
       return data;
     },
+    staleTime: 30_000,
     ...options,
   });
 }

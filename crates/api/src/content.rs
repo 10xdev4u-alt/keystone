@@ -810,7 +810,12 @@ pub async fn create_comment(
         }
     }
     tracing::info!(comment_id = %comment.id, post_id = %post_id, "comment created");
-    Ok((StatusCode::CREATED, Json(CommentResponse { comment: comment_view(&comment) })))
+    Ok((
+        StatusCode::CREATED,
+        Json(CommentResponse {
+            comment: comment_view(&comment),
+        }),
+    ))
 }
 
 /// List a post's comments (threaded).

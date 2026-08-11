@@ -2149,6 +2149,20 @@ export interface components {
             parent_id?: string | null;
             post_id: string;
         };
+        /** @description Paged communities response. */
+        CommunityList: {
+            communities: components["schemas"]["CommunityView"][];
+        };
+        /** @description Community card — the list and detail contract. */
+        CommunityView: {
+            created_at: string;
+            created_by: string;
+            description?: string | null;
+            id: string;
+            name: string;
+            slug: string;
+            visibility: string;
+        };
         CreateAnswerRequest: {
             body: string;
         };
@@ -3161,7 +3175,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CommunityList"];
                 };
             };
         };

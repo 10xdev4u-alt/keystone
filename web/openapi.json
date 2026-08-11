@@ -724,7 +724,9 @@
             "description": "Communities page",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityList"
+                }
               }
             }
           }
@@ -5733,6 +5735,59 @@
             ]
           },
           "post_id": {
+            "type": "string"
+          }
+        }
+      },
+      "CommunityList": {
+        "type": "object",
+        "description": "Paged communities response.",
+        "required": [
+          "communities"
+        ],
+        "properties": {
+          "communities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommunityView"
+            }
+          }
+        }
+      },
+      "CommunityView": {
+        "type": "object",
+        "description": "Community card — the list and detail contract.",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "visibility",
+          "created_by",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "visibility": {
             "type": "string"
           }
         }
