@@ -18,6 +18,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 async-trait = "0.1"
 futures = "0.3"
+aws-config = "1"
+aws-sdk-s3 = "1"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 dotenvy = "0.15"
 thiserror = "2"
 anyhow = "1"

@@ -14,7 +14,10 @@ test-util = []
 
 [dependencies]
 async-trait.workspace = true
+aws-config.workspace = true
+aws-sdk-s3.workspace = true
 chrono.workspace = true
+image.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
