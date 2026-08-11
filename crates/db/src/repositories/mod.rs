@@ -5,12 +5,17 @@
 //! (sqlx offline metadata) lands as a dedicated hardening PR so it can be
 //! reviewed on its own.
 
+pub mod assessments;
 pub mod bookmarks;
 pub mod careers;
 pub mod comments;
 pub mod communities;
 pub mod community_posts;
+pub mod credits;
+pub mod events;
+pub mod learning;
 pub mod links;
+pub mod mentorship;
 pub mod moderation;
 pub mod organizations;
 pub mod polls;
