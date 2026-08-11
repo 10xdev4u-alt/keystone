@@ -2132,6 +2132,23 @@ export interface components {
         ClaimRequest: {
             domain: string;
         };
+        /** @description Comment thread for a post. */
+        CommentList: {
+            comments: components["schemas"]["CommentView"][];
+        };
+        /** @description Single-comment create response. */
+        CommentResponse: {
+            comment: components["schemas"]["CommentView"];
+        };
+        /** @description A single comment in a thread. */
+        CommentView: {
+            author_id: string;
+            body: string;
+            created_at: string;
+            id: string;
+            parent_id?: string | null;
+            post_id: string;
+        };
         CreateAnswerRequest: {
             body: string;
         };
@@ -2286,6 +2303,10 @@ export interface components {
             /** Format: int64 */
             offset?: number;
         };
+        /** @description Wrapper for the single-post endpoint. */
+        PostDetailResponse: {
+            post: components["schemas"]["PostView"];
+        };
         /** @description A single post in a list page — the feed card contract. */
         PostListItem: {
             author_id: string;
@@ -2325,6 +2346,23 @@ export interface components {
             kind?: string | null;
             /** Format: int64 */
             limit?: number;
+        };
+        /** @description Full post — the reader view contract. */
+        PostView: {
+            author_id: string;
+            body: string;
+            created_at: string;
+            id: string;
+            kind: string;
+            published_at?: string | null;
+            slug: string;
+            status: string;
+            summary?: string | null;
+            title: string;
+            updated_at?: string | null;
+            /** Format: int64 */
+            view_count: number;
+            visibility: string;
         };
         PreferencesRequest: {
             digest?: boolean | null;
@@ -5893,7 +5931,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PostDetailResponse"];
                 };
             };
             /** @description Post not found or not visible */
@@ -6227,7 +6265,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CommentList"];
                 };
             };
         };
@@ -6254,7 +6292,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CommentResponse"];
                 };
             };
             /** @description Missing or invalid access token */
