@@ -31,6 +31,7 @@ use keystone_db::repositories::mentorship::Mentorship;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::Digest;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 const TITLE_MAX: usize = 200;
@@ -54,19 +55,19 @@ fn is_staff(role: &str) -> bool {
 
 // ── Courses ─────────────────────────────────────────────────────────────────
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct CreateCourseRequest {
     pub title: String,
     pub description: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct ModuleRequest {
     pub position: i32,
     pub title: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct LessonRequest {
     pub position: i32,
     pub title: String,
@@ -74,12 +75,24 @@ pub struct LessonRequest {
     pub duration_seconds: Option<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct AnswerRequest {
     pub question_id: Uuid,
     pub response: String,
 }
 
+/// Create a course (draft). The creator is the author.
+#[utoipa::path(
+    post,
+    path = "/api/v1/courses",
+    request_body = CreateCourseRequest,
+    responses(
+        (status = 201, description = "Course created", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn create_course(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -112,6 +125,19 @@ pub async fn create_course(
     ))
 }
 
+/// List published courses (paged).
+#[utoipa::path(
+    get,
+    path = "/api/v1/courses",
+    params(
+        ("limit" = Option<i64>, Query, description = "Page size"),
+        ("offset" = Option<i64>, Query, description = "Page offset"),
+    ),
+    responses(
+        (status = 200, description = "Courses page", body = Value),
+    ),
+    tag = "learning"
+)]
 pub async fn list_courses(
     State(state): State<AppState>,
     Query(query): Query<PageQuery>,
@@ -125,6 +151,17 @@ pub async fn list_courses(
     Ok(Json(json!({ "courses": items })))
 }
 
+/// Fetch a course by slug with its module tree.
+#[utoipa::path(
+    get,
+    path = "/api/v1/courses/{slug}",
+    params(("slug" = String, Path, description = "Course slug")),
+    responses(
+        (status = 200, description = "Course with modules/lessons", body = Value),
+        (status = 404, description = "Course not found"),
+    ),
+    tag = "learning"
+)]
 pub async fn get_course(
     State(state): State<AppState>,
     Path(slug): Path<String>,
@@ -157,6 +194,19 @@ pub async fn get_course(
 }
 
 /// Publish — the course author or platform staff.
+/// Publish a course. Author only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/courses/{slug}/publish",
+    params(("slug" = String, Path, description = "Course slug")),
+    responses(
+        (status = 204, description = "Published"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the course author"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn publish_course(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -187,6 +237,20 @@ pub async fn publish_course(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Add a module to a course. Author only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/courses/{slug}/modules",
+    request_body = ModuleRequest,
+    params(("slug" = String, Path, description = "Course slug")),
+    responses(
+        (status = 201, description = "Module added", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the course author"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn add_module(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -206,6 +270,23 @@ pub async fn add_module(
     ))
 }
 
+/// Add a lesson to a module. Author only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/courses/{slug}/modules/{module_id}/lessons",
+    request_body = LessonRequest,
+    params(
+        ("slug" = String, Path, description = "Course slug"),
+        ("module_id" = Uuid, Path, description = "Module id"),
+    ),
+    responses(
+        (status = 201, description = "Lesson added", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the course author"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn add_lesson(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -263,6 +344,18 @@ async fn require_course_editor(
     Ok(())
 }
 
+/// Enroll the caller in a course.
+#[utoipa::path(
+    post,
+    path = "/api/v1/courses/{slug}/enroll",
+    params(("slug" = String, Path, description = "Course slug")),
+    responses(
+        (status = 204, description = "Enrolled"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn enroll(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -277,6 +370,21 @@ pub async fn enroll(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Mark a lesson complete for the caller (updates progress).
+#[utoipa::path(
+    post,
+    path = "/api/v1/courses/{slug}/lessons/{lesson_id}/complete",
+    params(
+        ("slug" = String, Path, description = "Course slug"),
+        ("lesson_id" = Uuid, Path, description = "Lesson id"),
+    ),
+    responses(
+        (status = 200, description = "Updated progress", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn complete_lesson(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -311,6 +419,18 @@ pub async fn complete_lesson(
     })))
 }
 
+/// The caller's progress in a course.
+#[utoipa::path(
+    get,
+    path = "/api/v1/courses/{slug}/progress",
+    params(("slug" = String, Path, description = "Course slug")),
+    responses(
+        (status = 200, description = "Progress summary", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn course_progress(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -343,6 +463,17 @@ pub async fn course_progress(
     })))
 }
 
+/// Certificates earned by the caller.
+#[utoipa::path(
+    get,
+    path = "/api/v1/me/certificates",
+    responses(
+        (status = 200, description = "Certificates", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn my_certificates(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -367,25 +498,39 @@ pub async fn my_certificates(
 
 // ── Assessments ─────────────────────────────────────────────────────────────
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct AssessmentRequest {
     pub title: String,
     pub pass_threshold: i32,
     pub time_limit_seconds: Option<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct QuestionRequest {
     pub position: i32,
     pub prompt: String,
     pub correct_response: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct SubmitRequest {
     pub answers: Vec<AnswerRequest>,
 }
 
+/// Create an assessment for a course. Author only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/courses/{slug}/assessments",
+    request_body = AssessmentRequest,
+    params(("slug" = String, Path, description = "Course slug")),
+    responses(
+        (status = 201, description = "Assessment created", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the course author"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn create_assessment(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -410,6 +555,23 @@ pub async fn create_assessment(
     ))
 }
 
+/// Add a question to an assessment. Author only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/courses/{slug}/assessments/{assessment_id}/questions",
+    request_body = QuestionRequest,
+    params(
+        ("slug" = String, Path, description = "Course slug"),
+        ("assessment_id" = Uuid, Path, description = "Assessment id"),
+    ),
+    responses(
+        (status = 201, description = "Question added", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the course author"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn add_question(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -435,6 +597,17 @@ pub async fn add_question(
 }
 
 /// Public question read — the grading key is never selected.
+/// Fetch an assessment with its questions.
+#[utoipa::path(
+    get,
+    path = "/api/v1/assessments/{id}",
+    params(("id" = Uuid, Path, description = "Assessment id")),
+    responses(
+        (status = 200, description = "Assessment + questions", body = Value),
+        (status = 404, description = "Assessment not found"),
+    ),
+    tag = "learning"
+)]
 pub async fn get_assessment(
     State(state): State<AppState>,
     Path(assessment_id): Path<Uuid>,
@@ -463,6 +636,18 @@ pub async fn get_assessment(
     })))
 }
 
+/// Start an attempt on an assessment (returns the attempt + questions).
+#[utoipa::path(
+    post,
+    path = "/api/v1/assessments/{id}/attempts",
+    params(("id" = Uuid, Path, description = "Assessment id")),
+    responses(
+        (status = 201, description = "Attempt started", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn start_attempt(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -479,6 +664,19 @@ pub async fn start_attempt(
     ))
 }
 
+/// Submit an attempt for auto-grading.
+#[utoipa::path(
+    post,
+    path = "/api/v1/attempts/{id}/submit",
+    request_body = SubmitRequest,
+    params(("id" = Uuid, Path, description = "Attempt id")),
+    responses(
+        (status = 200, description = "Grade result", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn submit_attempt(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -505,6 +703,18 @@ pub async fn submit_attempt(
     })))
 }
 
+/// The caller's attempts on an assessment.
+#[utoipa::path(
+    get,
+    path = "/api/v1/assessments/{id}/attempts",
+    params(("id" = Uuid, Path, description = "Assessment id")),
+    responses(
+        (status = 200, description = "Attempt history", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn my_attempts(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -532,12 +742,23 @@ pub async fn my_attempts(
 
 // ── Credits ─────────────────────────────────────────────────────────────────
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct CreditRequest {
     pub amount: i32,
     pub reason: String,
 }
 
+/// The caller's credit balance.
+#[utoipa::path(
+    get,
+    path = "/api/v1/me/credits",
+    responses(
+        (status = 200, description = "Balance", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn my_balance(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -551,6 +772,18 @@ pub async fn my_balance(
 }
 
 /// Redeem credits — double-spend-safe at the repo (SERIALIZABLE).
+/// Redeem credits for a reward.
+#[utoipa::path(
+    post,
+    path = "/api/v1/me/credits/redeem",
+    request_body = CreditRequest,
+    responses(
+        (status = 201, description = "Redemption result", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn redeem_credits(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -580,6 +813,17 @@ pub async fn redeem_credits(
     ))
 }
 
+/// The caller's credit ledger (earn/spend history).
+#[utoipa::path(
+    get,
+    path = "/api/v1/me/credits/ledger",
+    responses(
+        (status = 200, description = "Ledger entries", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn my_ledger(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -605,30 +849,42 @@ pub async fn my_ledger(
 
 // ── Mentorship ──────────────────────────────────────────────────────────────
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct MentorProfileRequest {
     pub bio: Option<String>,
     pub areas: Option<String>,
     pub available: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct MentorshipRequest {
     pub message: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct SessionRequest {
     pub scheduled_at: chrono::DateTime<chrono::Utc>,
     pub duration_minutes: i32,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct FeedbackRequest {
     pub rating: i32,
     pub comment: Option<String>,
 }
 
+/// Set (or clear) the caller's mentor profile.
+#[utoipa::path(
+    put,
+    path = "/api/v1/me/mentor-profile",
+    request_body = MentorProfileRequest,
+    responses(
+        (status = 200, description = "Updated mentor profile", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn set_mentor_profile(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -650,6 +906,15 @@ pub async fn set_mentor_profile(
     })))
 }
 
+/// List mentors accepting new mentees.
+#[utoipa::path(
+    get,
+    path = "/api/v1/mentors",
+    responses(
+        (status = 200, description = "Mentor list", body = Value),
+    ),
+    tag = "learning"
+)]
 pub async fn available_mentors(State(state): State<AppState>) -> ApiResult<Json<Value>> {
     let mentorship = Mentorship::new(state.pool.clone());
     let rows = mentorship
@@ -669,6 +934,19 @@ pub async fn available_mentors(State(state): State<AppState>) -> ApiResult<Json<
     Ok(Json(json!({ "mentors": items })))
 }
 
+/// Request mentorship from a mentor.
+#[utoipa::path(
+    post,
+    path = "/api/v1/users/{mentor_id}/mentorship",
+    request_body = MentorshipRequest,
+    params(("mentor_id" = Uuid, Path, description = "Mentor user id")),
+    responses(
+        (status = 201, description = "Request sent", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn request_mentorship(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -695,6 +973,19 @@ pub async fn request_mentorship(
     ))
 }
 
+/// Accept a mentorship request. Mentor only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/mentorship/{request_id}/accept",
+    params(("request_id" = Uuid, Path, description = "Mentorship request id")),
+    responses(
+        (status = 204, description = "Accepted"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the mentor"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn accept_mentorship(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -711,6 +1002,19 @@ pub async fn accept_mentorship(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Decline a mentorship request. Mentor only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/mentorship/{request_id}/decline",
+    params(("request_id" = Uuid, Path, description = "Mentorship request id")),
+    responses(
+        (status = 204, description = "Declined"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the mentor"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn decline_mentorship(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -727,6 +1031,20 @@ pub async fn decline_mentorship(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Schedule a session on an accepted mentorship. Mentor only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/mentorship/{request_id}/sessions",
+    request_body = SessionRequest,
+    params(("request_id" = Uuid, Path, description = "Mentorship request id")),
+    responses(
+        (status = 201, description = "Session scheduled", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the mentor"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn schedule_session(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -752,6 +1070,20 @@ pub async fn schedule_session(
     ))
 }
 
+/// Leave feedback on a session. Participants only; one per person.
+#[utoipa::path(
+    post,
+    path = "/api/v1/sessions/{session_id}/feedback",
+    request_body = FeedbackRequest,
+    params(("session_id" = Uuid, Path, description = "Session id")),
+    responses(
+        (status = 201, description = "Feedback recorded", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not a participant"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn add_feedback(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -776,7 +1108,7 @@ pub async fn add_feedback(
 
 // ── Events ──────────────────────────────────────────────────────────────────
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct CreateEventRequest {
     pub title: String,
     pub description: Option<String>,
@@ -786,6 +1118,18 @@ pub struct CreateEventRequest {
     pub location: Option<String>,
 }
 
+/// Create an event. The creator becomes the organizer.
+#[utoipa::path(
+    post,
+    path = "/api/v1/events",
+    request_body = CreateEventRequest,
+    responses(
+        (status = 201, description = "Event created", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn create_event(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -822,6 +1166,19 @@ pub async fn create_event(
     ))
 }
 
+/// List upcoming events (paged).
+#[utoipa::path(
+    get,
+    path = "/api/v1/events",
+    params(
+        ("limit" = Option<i64>, Query, description = "Page size"),
+        ("offset" = Option<i64>, Query, description = "Page offset"),
+    ),
+    responses(
+        (status = 200, description = "Events page", body = Value),
+    ),
+    tag = "learning"
+)]
 pub async fn list_events(
     State(state): State<AppState>,
     Query(query): Query<PageQuery>,
@@ -835,6 +1192,17 @@ pub async fn list_events(
     Ok(Json(json!({ "events": items })))
 }
 
+/// Fetch an event by slug with capacity and waitlist state.
+#[utoipa::path(
+    get,
+    path = "/api/v1/events/{slug}",
+    params(("slug" = String, Path, description = "Event slug")),
+    responses(
+        (status = 200, description = "Event", body = Value),
+        (status = 404, description = "Event not found"),
+    ),
+    tag = "learning"
+)]
 pub async fn get_event(
     State(state): State<AppState>,
     maybe: MaybeUser,
@@ -861,6 +1229,18 @@ pub async fn get_event(
     })))
 }
 
+/// Register for an event (or join its waitlist when full).
+#[utoipa::path(
+    post,
+    path = "/api/v1/events/{slug}/register",
+    params(("slug" = String, Path, description = "Event slug")),
+    responses(
+        (status = 200, description = "Registration result", body = Value),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn register_event(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -879,6 +1259,18 @@ pub async fn register_event(
     Ok(Json(json!({ "status": status })))
 }
 
+/// Cancel an event registration (promotes from the waitlist).
+#[utoipa::path(
+    delete,
+    path = "/api/v1/events/{slug}/registration",
+    params(("slug" = String, Path, description = "Event slug")),
+    responses(
+        (status = 204, description = "Registration cancelled"),
+        (status = 401, description = "Missing or invalid access token"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn cancel_registration(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -897,6 +1289,22 @@ pub async fn cancel_registration(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Add a speaker to an event. Organizer only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/events/{slug}/speakers/{speaker_id}",
+    params(
+        ("slug" = String, Path, description = "Event slug"),
+        ("speaker_id" = Uuid, Path, description = "Speaker user id"),
+    ),
+    responses(
+        (status = 204, description = "Speaker added"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Not the organizer"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
 pub async fn add_speaker(
     State(state): State<AppState>,
     auth_user: AuthUser,
