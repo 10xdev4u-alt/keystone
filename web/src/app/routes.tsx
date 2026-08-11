@@ -28,6 +28,9 @@ const CommunitiesPage = lazy(() =>
 const CommunityPage = lazy(() =>
   import("../pages/CommunityPage").then((m) => ({ default: m.CommunityPage })),
 );
+const EventsPage = lazy(() =>
+  import("../pages/EventsPage").then((m) => ({ default: m.EventsPage })),
+);
 const LoginPage = lazy(() =>
   import("../pages/auth/LoginPage").then((m) => ({ default: m.LoginPage })),
 );
@@ -65,7 +68,7 @@ export const routesConfig: RouteObject[] = [
       { path: "/posts/:id", element: withSuspense(<PostPage />) },
       { path: "/communities", element: withSuspense(<CommunitiesPage />) },
       { path: "/communities/:slug", element: withSuspense(<CommunityPage />) },
-      { path: "/events", element: withSuspense(<Placeholder title="Events" />) },
+      { path: "/events", element: withSuspense(<EventsPage />) },
       { path: "/events/:slug", element: withSuspense(<Placeholder title="Event" />) },
       { path: "/orgs", element: withSuspense(<Placeholder title="Organizations" />) },
       { path: "/orgs/:slug", element: withSuspense(<Placeholder title="Organization" />) },

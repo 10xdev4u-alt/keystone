@@ -237,6 +237,8 @@ use utoipa::{Modify, OpenApi};
         crate::learning_api::MentorshipRequest,
         crate::learning_api::SessionRequest,
         crate::learning_api::FeedbackRequest,
+        crate::learning_api::EventView,
+        crate::learning_api::EventList,
         crate::learning_api::CreateEventRequest,
         crate::realtime::ListQuery,
         crate::realtime::MarkReadRequest,

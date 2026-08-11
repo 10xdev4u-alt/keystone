@@ -27,6 +27,7 @@ type CommunityList = components["schemas"]["CommunityList"];
 type CommunityDetailResponse = components["schemas"]["CommunityDetailResponse"];
 type MemberList = components["schemas"]["MemberList"];
 type CommunityPostList = components["schemas"]["CommunityPostList"];
+type EventList = components["schemas"]["EventList"];
 
 /**
  * Caller-facing options for query wrapper hooks. The hook owns `queryKey` and
@@ -338,7 +339,7 @@ export function useCourses(
 
 export function useEvents(
   query: operations["list_events"]["parameters"]["query"] = {},
-  options?: UseQueryOptions<unknown, ApiRequestError>,
+  options?: QueryOptions<EventList>,
 ) {
   return useQuery({
     queryKey: ["events", query],
@@ -347,8 +348,10 @@ export function useEvents(
         params: { query },
       });
       if (error) throw error;
+      if (!data) throw new Error("Empty events response");
       return data;
     },
+    staleTime: 30_000,
     ...options,
   });
 }

@@ -17,6 +17,20 @@ vi.mock("../api/hooks", () => ({
     error: null,
     refetch: vi.fn(),
   })),
+  useEvents: vi.fn(() => ({
+    data: { events: [] },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+  useCommunities: vi.fn(() => ({
+    data: { communities: [] },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
 }));
 
 function renderAt(path: string) {

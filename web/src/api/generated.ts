@@ -2259,6 +2259,24 @@ export interface components {
             /** Format: int32 */
             start_year: number;
         };
+        /** @description Paged events response. */
+        EventList: {
+            events: components["schemas"]["EventView"][];
+        };
+        /** @description Event card — the list contract. */
+        EventView: {
+            /** Format: int32 */
+            capacity?: number | null;
+            description?: string | null;
+            ends_at: string;
+            id: string;
+            location?: string | null;
+            organizer_id: string;
+            slug: string;
+            starts_at: string;
+            status: string;
+            title: string;
+        };
         ExperienceRequest: {
             company?: string | null;
             current: boolean;
@@ -4172,7 +4190,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EventList"];
                 };
             };
         };

@@ -1951,7 +1951,9 @@
             "description": "Events page",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/EventList"
+                }
               }
             }
           }
@@ -6152,6 +6154,76 @@
           "start_year": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "EventList": {
+        "type": "object",
+        "description": "Paged events response.",
+        "required": [
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventView"
+            }
+          }
+        }
+      },
+      "EventView": {
+        "type": "object",
+        "description": "Event card — the list contract.",
+        "required": [
+          "id",
+          "organizer_id",
+          "title",
+          "slug",
+          "starts_at",
+          "ends_at",
+          "status"
+        ],
+        "properties": {
+          "capacity": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ends_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "organizer_id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "starts_at": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
           }
         }
       },
