@@ -21,7 +21,8 @@
     "@radix-ui/react-toast": "^1.2.23",
     "clsx": "^2.1.1",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.2"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

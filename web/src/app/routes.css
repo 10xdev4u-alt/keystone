@@ -1,0 +1,14 @@
+.route-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-block: var(--space-4);
+}
+
+.route-loading__line {
+  height: var(--space-5);
+}
+
+.route-loading__line--short {
+  width: 55%;
+}
