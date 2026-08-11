@@ -15,6 +15,16 @@
 
 <!-- Anything the reviewer should look at closely: tricky invariants, concurrency, migration ordering, backward compatibility. -->
 
+## Visual QA (design-review gate)
+
+Any change that touches UI ships with a pass of this checklist against the live preview:
+
+- [ ] Renders correctly at 320px, 768px, and 1280px — no horizontal scroll, no clipped content.
+- [ ] Touch targets ≥ 44px on `pointer: coarse` (buttons, nav links, inputs, revoke actions).
+- [ ] Sticky nav stays usable; scrollable nav rows don't fight the page scroll.
+- [ ] Dark theme passes (system toggle) where the screen has surfaces.
+- [ ] Empty / error / loading states not regressed by the layout change.
+
 ## Testing
 
 <!-- What was run locally: cargo test, specific test names, manual curl checks. -->

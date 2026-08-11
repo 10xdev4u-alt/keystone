@@ -109,6 +109,17 @@
   --control-height-lg: 3rem;
 }
 
+/* Touch devices: every interactive control must clear the 44px target
+   (WCAG 2.5.5 / Apple HIG). Desktop keeps the compact heights; coarse
+   pointers get the guarantee. */
+@media (pointer: coarse) {
+  :root {
+    --control-height-sm: 2.75rem;
+    --control-height-md: 3rem;
+    --control-height-lg: 3.5rem;
+  }
+}
+
 /* Dark theme — follows system unless [data-theme="dark"] is set. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {

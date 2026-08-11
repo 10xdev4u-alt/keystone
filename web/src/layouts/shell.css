@@ -203,6 +203,18 @@
     overflow-x: auto;
   }
 
+  /* Touch height for scrollable nav rows — links keep horizontal padding
+     so the row doesn't dominate the viewport. */
+  .shell-nav__link {
+    min-height: 2.75rem;
+  }
+
+  .shell__header .shell__link {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+  }
+
   .shell--app,
   .shell--admin {
     flex-direction: column;
