@@ -21,6 +21,7 @@ pub mod middleware;
 pub mod moderation;
 pub mod network;
 pub mod oauth;
+pub mod openapi;
 pub mod qa;
 pub mod rbac;
 pub mod realtime;
@@ -39,6 +40,8 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use std::time::Instant;
 use tower_http::cors::CorsLayer;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 /// Shared application state.
 #[derive(Clone)]
@@ -61,6 +64,10 @@ pub struct AppState {
 /// default. The fallback (404) is intentionally not rate-limited.
 pub fn router(state: AppState) -> Router {
     let router = Router::new()
+        // OpenAPI document + interactive Swagger UI. The spec drives the
+        // generated frontend client; it must stay in sync with the router by
+        // construction (every handler carries #[utoipa::path]).
+        .merge(SwaggerUi::new("/swagger").url("/openapi.json", openapi::ApiDoc::openapi()))
         .route("/api/v1/auth/register", post(auth::register))
         .route("/api/v1/auth/verify-email", post(auth::verify_email))
         .route("/api/v1/auth/login", post(auth::login))

@@ -34,6 +34,9 @@ hex = "0.4"
 sha2 = "0.10"
 subtle = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
+utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-axum = "0.1"
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
