@@ -1,0 +1,14 @@
+DROP TABLE IF EXISTS self_assessments;
+DROP TABLE IF EXISTS career_path_steps;
+DROP TABLE IF EXISTS career_paths;
+DROP TABLE IF EXISTS compliance_alerts;
+DROP TABLE IF EXISTS vendor_listings;
+DROP TABLE IF EXISTS salary_benchmarks;
+DROP TABLE IF EXISTS user_skills;
+DROP TABLE IF EXISTS user_experience;
+DROP TABLE IF EXISTS user_education;
+DROP TABLE IF EXISTS user_profiles;
+DROP TABLE IF EXISTS user_links;
+DROP TABLE IF EXISTS organization_claims;
+DROP TABLE IF EXISTS organization_members;
+DROP TABLE IF EXISTS organizations;
