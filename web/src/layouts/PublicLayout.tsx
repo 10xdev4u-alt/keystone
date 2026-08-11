@@ -16,7 +16,7 @@ function AuthActions() {
   if (me) {
     return (
       <div className="shell__actions shell__actions--user">
-        <Link to="/me/profile" className="shell__user">
+        <Link to="/me" className="shell__user">
           <Avatar name={me.username ?? me.email} size="sm" />
           <span className="shell__user-name">{me.username ?? me.email}</span>
         </Link>

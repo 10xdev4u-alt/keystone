@@ -2,8 +2,9 @@
 //!
 //! In-memory fixed-window counters per (tier, client key). Single-instance
 //! correct; a shared store (Redis/Postgres) is a documented follow-up when the
-//! API scales past one process. Auth routes get a strict tier; the rest get a
-//! generous default. Every 429 carries a `Retry-After` header.
+//! API scales past one process. Auth routes get a strict tier; cookie-authenticated
+//! session routes a generous one (every SPA navigation re-validates the session);
+//! the rest get a generous default. Every 429 carries a `Retry-After` header.
 
 use crate::error::ApiError;
 use axum::body::Body;
@@ -19,8 +20,13 @@ use std::time::{Duration, Instant};
 /// Route rate tiers. Tuning lives here until it earns env config.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RateTier {
-    /// Auth routes: strict, brute-force protection on top of lockout.
+    /// Credential routes (login, register, verify, resets): strict, brute-force
+    /// protection on top of lockout.
     Auth,
+    /// Session routes (refresh, logout, change-password): CSRF-guarded and
+    /// cookie-authenticated, so they are already protected; the SPA calls
+    /// refresh on every page load, so a strict IP tier would 429 normal use.
+    Session,
     /// Everything else.
     Default,
 }
@@ -41,6 +47,7 @@ const fn limit(max: u32, secs: u64) -> Limit {
 fn limits(tier: RateTier) -> Limit {
     match tier {
         RateTier::Auth => limit(10, 60),
+        RateTier::Session => limit(60, 60),
         RateTier::Default => limit(120, 60),
     }
 }
@@ -126,7 +133,7 @@ async fn enforce(
     next.run(request).await
 }
 
-/// Strict tier — auth routes.
+/// Strict tier — credential auth routes.
 pub async fn rate_limit_auth(
     State(state): State<crate::AppState>,
     headers: HeaderMap,
@@ -134,6 +141,18 @@ pub async fn rate_limit_auth(
     next: Next,
 ) -> Response {
     enforce(&state, RateTier::Auth, &headers, request, next).await
+}
+
+/// Generous tier — cookie-authenticated session routes (refresh, logout,
+/// change-password). CSRF-guarded, so the looser IP budget is safe: the SPA
+/// hits refresh on every page load and must never 429 normal navigation.
+pub async fn rate_limit_session(
+    State(state): State<crate::AppState>,
+    headers: HeaderMap,
+    request: Request<Body>,
+    next: Next,
+) -> Response {
+    enforce(&state, RateTier::Session, &headers, request, next).await
 }
 
 /// Generous tier — the rest of the API.
@@ -189,5 +208,35 @@ mod tests {
         }
         assert!(limiter.check(RateTier::Default, "9.9.9.9", now).is_err());
         assert_eq!(limiter.check(RateTier::Auth, "9.9.9.9", now), Ok(()));
+    }
+
+    #[test]
+    fn session_tier_is_more_generous_than_auth() {
+        let limiter = RateLimiter::new();
+        let now = Instant::now();
+        // 30 rapid session-route calls (SPA navigation) all pass.
+        for i in 0..30 {
+            assert_eq!(
+                limiter.check(RateTier::Session, "1.2.3.4", now + Duration::from_millis(i)),
+                Ok(())
+            );
+        }
+        // The same burst on the Auth tier would already be limited (11th call
+        // in the window errors), proving Session is the looser tier.
+        for i in 0..10 {
+            assert_eq!(
+                limiter.check(RateTier::Auth, "5.6.7.8", now + Duration::from_millis(i)),
+                Ok(())
+            );
+        }
+        assert!(limiter.check(RateTier::Auth, "5.6.7.8", now).is_err());
+        // Session tier eventually limits too (bounded, not unlimited).
+        for i in 30..60 {
+            assert_eq!(
+                limiter.check(RateTier::Session, "1.2.3.4", now + Duration::from_millis(i)),
+                Ok(())
+            );
+        }
+        assert!(limiter.check(RateTier::Session, "1.2.3.4", now).is_err());
     }
 }

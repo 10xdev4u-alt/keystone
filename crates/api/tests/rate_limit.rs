@@ -73,6 +73,15 @@ fn post_login(body: Value) -> Request<Body> {
         .expect("request must build")
 }
 
+fn post_logout() -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri("/api/v1/auth/logout")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::empty())
+        .expect("request must build")
+}
+
 #[tokio::test]
 async fn auth_tier_limits_and_sends_retry_after() {
     let Some((app, _)) = test_app().await else {
@@ -146,6 +155,31 @@ async fn different_clients_are_independent() {
         .await
         .unwrap();
     assert_eq!(b_ok.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn session_tier_absorbs_spa_navigation_burst() {
+    let Some((app, _)) = test_app().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+
+    // A SPA session check (refresh/logout) after every page load: 30 rapid
+    // calls from one client must all reach the handler (CSRF 401 or not — the
+    // limiter never 429s them). The Auth tier would reject at 11.
+    let key = HeaderValue::from_static("203.0.113.9");
+    for i in 0..30 {
+        let response = app
+            .clone()
+            .oneshot(post_logout().with_headers(&key))
+            .await
+            .unwrap();
+        assert_ne!(
+            response.status(),
+            StatusCode::TOO_MANY_REQUESTS,
+            "session-route call {i} must not be rate-limited"
+        );
+    }
 }
 
 #[tokio::test]
