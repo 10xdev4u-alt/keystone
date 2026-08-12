@@ -2355,7 +2355,9 @@
             "description": "File list",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/FileListResponse"
+                }
               }
             }
           },
@@ -2390,7 +2392,9 @@
             "description": "Registered file record",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/FileDetailResponse"
+                }
               }
             }
           },
@@ -2427,7 +2431,9 @@
             "description": "Presigned URL + upload params",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PresignResponse"
+                }
               }
             }
           },
@@ -2466,7 +2472,9 @@
             "description": "File record + download URL",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/FileDetailResponse"
+                }
               }
             }
           },
@@ -7015,6 +7023,82 @@
           }
         }
       },
+      "FileDetailResponse": {
+        "type": "object",
+        "description": "File detail / register result.",
+        "required": [
+          "file"
+        ],
+        "properties": {
+          "file": {
+            "$ref": "#/components/schemas/FileView"
+          }
+        }
+      },
+      "FileListResponse": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileView"
+            }
+          }
+        }
+      },
+      "FileView": {
+        "type": "object",
+        "description": "A file as seen by its owner.",
+        "required": [
+          "id",
+          "original_name",
+          "content_type",
+          "size_bytes",
+          "created_at"
+        ],
+        "properties": {
+          "content_type": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "get_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fresh presigned download URL where available (list rows carry none)."
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "original_name": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "width": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "ForgotPasswordRequest": {
         "type": "object",
         "required": [
@@ -7825,6 +7909,22 @@
           "size_bytes": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "PresignResponse": {
+        "type": "object",
+        "description": "Presigned upload coordinates: PUT the bytes here, then register.",
+        "required": [
+          "key",
+          "put_url"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "put_url": {
+            "type": "string"
           }
         }
       },

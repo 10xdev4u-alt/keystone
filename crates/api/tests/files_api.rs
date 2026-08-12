@@ -219,12 +219,13 @@ async fn presign_upload_register_download_delete_round_trip() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let body = json_body(res).await;
-    let id = body["id"].as_str().unwrap().to_string();
+    let file = &body["file"];
+    let id = file["id"].as_str().unwrap().to_string();
     // Thumbnail is generated server-side; dimensions are capped at 512.
-    let w = body["width"].as_i64().expect("width present");
-    let h = body["height"].as_i64().expect("height present");
+    let w = file["width"].as_i64().expect("width present");
+    let h = file["height"].as_i64().expect("height present");
     assert!((1..=512).contains(&w) && (1..=512).contains(&h));
-    assert!(body["get_url"].as_str().unwrap().starts_with("memory://"));
+    assert!(file["get_url"].as_str().unwrap().starts_with("memory://"));
 
     // 4. GET with a fresh presigned download url.
     let res = app
@@ -239,7 +240,7 @@ async fn presign_upload_register_download_delete_round_trip() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let body = json_body(res).await;
-    assert_eq!(body["original_name"], "hello world.png");
+    assert_eq!(body["file"]["original_name"], "hello world.png");
 
     // 5. List shows the file; delete removes it.
     let res = app
@@ -443,7 +444,10 @@ async fn forged_key_and_nonowner_access_are_rejected() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::OK);
-    let id = json_body(res).await["id"].as_str().unwrap().to_string();
+    let id = json_body(res).await["file"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let res = app
         .clone()

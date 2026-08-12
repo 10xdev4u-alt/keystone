@@ -10,11 +10,6 @@ import { RouteErrorBoundary } from "./ErrorBoundary";
 // Lazy: every route loads its module on first navigation, so the initial
 // bundle stays small and each screen splits into its own chunk. The
 // placeholder module is one chunk today; real screens swap in per-file.
-const Placeholder = lazy(() =>
-  import("../pages/PlaceholderPage").then((m) => ({
-    default: ({ title }: { title: string }) => <m.PlaceholderPage title={title} />,
-  })),
-);
 const MyFeedPage = lazy(() =>
   import("../pages/MyFeedPage").then((m) => ({ default: m.MyFeedPage })),
 );
@@ -35,6 +30,9 @@ const CoursesPage = lazy(() =>
 );
 const CoursePage = lazy(() =>
   import("../pages/CoursePage").then((m) => ({ default: m.CoursePage })),
+);
+const FilesPage = lazy(() =>
+  import("../pages/FilesPage").then((m) => ({ default: m.FilesPage })),
 );
 
 const HomePage = lazy(() =>
@@ -145,7 +143,7 @@ export const routesConfig: RouteObject[] = [
       { path: "/me", element: withSuspense(<MyFeedPage />) },
       { path: "/me/notifications", element: withSuspense(<NotificationsPage />) },
       { path: "/me/conversations", element: withSuspense(<MessagesPage />) },
-      { path: "/me/files", element: withSuspense(<Placeholder title="My files" />) },
+      { path: "/me/files", element: withSuspense(<FilesPage />) },
       { path: "/me/profile", element: withSuspense(<MyProfileRedirect />) },
       { path: "/me/sessions", element: withSuspense(<SessionsPage />) },
       { path: "/me/settings", element: withSuspense(<SettingsPage />) },
