@@ -11,7 +11,7 @@
 //!   "payload": { ... } }
 //! ```
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { getAccessToken } from "../api/client";
 import type { components } from "../api/generated";
@@ -20,6 +20,13 @@ type MessageListResponse = components["schemas"]["MessageListResponse"];
 type MessageView = components["schemas"]["MessageView"];
 
 export type PresenceStatus = "online" | "offline";
+
+/** Client→server frame shapes (mirror `ClientFrame` in crates/api/src/chat.rs). */
+export type ClientFrameOut =
+  | { type: "message"; body: string }
+  | { type: "typing" }
+  | { type: "read" }
+  | { type: "ack"; up_to?: string | null };
 
 export type ChatFrame = {
   type: "message" | "presence" | "typing" | "read" | "error";
@@ -94,6 +101,7 @@ export function useChatSocket(conversationId: string | null) {
   const [presence, setPresence] = useState<Record<string, PresenceStatus>>({});
   const [typing, setTyping] = useState<string[]>([]);
   const typingTimers = useRef(new Map<string, number>());
+  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -106,11 +114,14 @@ export function useChatSocket(conversationId: string | null) {
     let retries = 0;
     let timer: number | undefined;
 
+    wsRef.current = null;
+
     const wsBase = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
 
     function connect() {
       if (closed) return;
       ws = new WebSocket(`${wsBase}/api/v1/ws/chat/${convId}`, [`bearer.${token}`]);
+      wsRef.current = ws;
       ws.onopen = () => {
         retries = 0;
       };
@@ -156,8 +167,17 @@ export function useChatSocket(conversationId: string | null) {
       typingTimers.current.forEach((t) => window.clearTimeout(t));
       typingTimers.current.clear();
       ws?.close();
+      wsRef.current = null;
     };
   }, [conversationId, qc]);
 
-  return { presence, typing };
+  /** Send one client frame if the socket is open (no-op otherwise). */
+  const sendFrame = useCallback((frame: ClientFrameOut) => {
+    const ws = wsRef.current;
+    if (ws && typeof WebSocket !== "undefined" && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(frame));
+    }
+  }, []);
+
+  return { presence, typing, sendFrame };
 }
