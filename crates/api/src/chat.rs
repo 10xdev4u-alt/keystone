@@ -13,6 +13,7 @@ use crate::realtime::notify;
 use crate::AppState;
 use axum::extract::ws::{Message as WsMessage, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, Query, State};
+use axum::http::{header, HeaderMap};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use chrono::{DateTime, Utc};
@@ -411,7 +412,11 @@ pub async fn conversation_presence(
 ///
 /// Auth + membership are checked BEFORE the upgrade — a non-member never
 /// reaches the socket.
-/// Upgrade to the chat websocket for a conversation.
+///
+/// Browsers cannot set the `Authorization` header on a `WebSocket` upgrade,
+/// so the SPA authenticates via the `Sec-WebSocket-Protocol` subprotocol
+/// (`bearer.<jwt>`), which the server echoes back to complete the handshake.
+/// Native clients may keep using the standard Bearer header.
 #[utoipa::path(
     get,
     path = "/api/v1/ws/chat/{id}",
@@ -426,9 +431,38 @@ pub async fn conversation_presence(
 pub async fn chat_socket(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
-    user: AuthUser,
+    headers: HeaderMap,
     Path(conversation_id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
+    let token = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(str::to_owned)
+        .or_else(|| {
+            headers
+                .get(header::SEC_WEBSOCKET_PROTOCOL)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| {
+                    v.split(',')
+                        .map(str::trim)
+                        .find_map(|p| p.strip_prefix("bearer."))
+                })
+                .map(str::to_owned)
+        })
+        .ok_or(ApiError::Unauthorized)?;
+
+    let parsed = state
+        .auth
+        .jwt
+        .verify(&token)
+        .map_err(|_| ApiError::Unauthorized)?;
+    let user = AuthUser {
+        user_id: parsed.user_id.parse().map_err(|_| ApiError::Unauthorized)?,
+        role: parsed.role,
+        impersonator_id: parsed.impersonator_id,
+    };
+
     let chat = Chat::new(state.pool.clone());
     if !chat
         .is_member(conversation_id, user.user_id)
@@ -438,7 +472,10 @@ pub async fn chat_socket(
         return Err(ApiError::Forbidden);
     }
     let gate = std::sync::Arc::new(MessageGate::new(30, Duration::from_secs(10)));
-    Ok(ws.on_upgrade(move |socket| handle_socket(socket, state, user, conversation_id, gate)))
+    // Echo the offered subprotocol so the browser handshake completes.
+    Ok(ws
+        .protocols([format!("bearer.{token}")])
+        .on_upgrade(move |socket| handle_socket(socket, state, user, conversation_id, gate)))
 }
 
 /// Client→server frame shapes.
