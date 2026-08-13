@@ -16,10 +16,12 @@ class FakeWebSocket {
   readyState = FakeWebSocket.OPEN;
   sent: string[] = [];
 
-  constructor(
-    public url: string,
-    public protocols?: string[],
-  ) {
+  url: string;
+  protocols?: string[];
+
+  constructor(url: string, protocols?: string[]) {
+    this.url = url;
+    this.protocols = protocols;
     FakeWebSocket.instances.push(this);
   }
 
