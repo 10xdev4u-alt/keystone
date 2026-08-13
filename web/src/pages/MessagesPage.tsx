@@ -10,6 +10,7 @@ import { ApiRequestError } from "../api/client";
 import { Button } from "../components/Button/Button";
 import { Input } from "../components/Input/Input";
 import { EmptyState, ErrorState, Skeleton } from "../components/Status/Status";
+import { useChatSocket } from "../lib/chatSocket";
 import { cn } from "../lib/cn";
 import "./messages.css";
 
@@ -43,6 +44,7 @@ export function MessagesPage() {
     enabled: Boolean(me),
   });
   const { data: messages } = useMessages(activeId);
+  const { presence, typing } = useChatSocket(activeId);
   const send = useSendMessage(activeId, {
     onSuccess: () => setDraft(""),
   });
@@ -163,6 +165,23 @@ export function MessagesPage() {
             />
           ) : (
             <>
+              <header className="messages__thread-head">
+                <h2 className="messages__thread-title">
+                  {conversationLabel(
+                    convos?.conversations.find((c) => c.id === activeId)?.type ?? "direct",
+                    convos?.conversations.find((c) => c.id === activeId)?.title ?? null,
+                  )}
+                </h2>
+                <p className="messages__thread-status" role="status">
+                  {typing.some((u) => u !== me?.id)
+                    ? "Typing…"
+                    : Object.entries(presence).some(
+                        ([id, status]) => status === "online" && id !== me?.id,
+                      )
+                      ? "Online"
+                      : ""}
+                </p>
+              </header>
               <div className="messages__thread-body">
                 {!messages ? (
                   <div data-testid="messages-loading" aria-label="Loading messages">
