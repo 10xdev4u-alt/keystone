@@ -2204,7 +2204,11 @@ export interface paths {
          * `GET /api/v1/ws/chat/{conversation_id}`.
          * @description Auth + membership are checked BEFORE the upgrade — a non-member never
          *     reaches the socket.
-         *     Upgrade to the chat websocket for a conversation.
+         *
+         *     Browsers cannot set the `Authorization` header on a `WebSocket` upgrade,
+         *     so the SPA authenticates via the `Sec-WebSocket-Protocol` subprotocol
+         *     (`bearer.<jwt>`), which the server echoes back to complete the handshake.
+         *     Native clients may keep using the standard Bearer header.
          */
         get: operations["chat_socket"];
         put?: never;
