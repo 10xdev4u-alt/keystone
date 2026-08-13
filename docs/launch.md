@@ -48,6 +48,12 @@ cargo build --release -p keystone-api
 # Binary: target/release/keystone-api
 ```
 
+Or build the container image (multi-stage, deps cached, non-root runtime):
+
+```bash
+docker build -t keystone-api .
+```
+
 The binary applies migrations on boot, so no separate migration step — but in
 production **prefer running migrations explicitly first** (see §3) so a bad
 migration fails the deploy instead of wedging the first request.
@@ -177,14 +183,35 @@ Notes:
   not domain-scoped); `CORS_ORIGINS` must list the exact origin the browser
   sees (scheme + host, no trailing slash).
 
-## 6. Backups
+## 6. All-in-one stack (docker compose)
+
+For a single-host deployment (or a faithful local replica of production), the
+repo ships a compose file wiring API + PostgreSQL + MinIO together:
+
+```bash
+cp .env.example .env              # set JWT_PRIVATE_KEY_B64 (required)
+export JWT_PRIVATE_KEY_B64="$(openssl rand -base64 48)"
+docker compose up -d --build
+curl -fsS localhost:4000/readyz   # DB reachable
+```
+
+The API container waits for Postgres to be healthy and for MinIO's bucket to
+exist before starting; storage defaults to `s3` against the bundled MinIO.
+Register a user, then promote the first admin:
+
+```bash
+docker compose exec db psql -U keystone -d keystone \
+  -c "UPDATE users SET role='super_admin' WHERE email='you@example.com';"
+```
+
+## 7. Backups
 
 See [`operations.md`](operations.md) — `pg_dump -Fc` on a schedule, mirror the
 object store **before** restoring the DB, and enable `wal_level=replica` +
 `archive_command` for point-in-time recovery. Test a restore at least once
 before you need it.
 
-## 7. Verify the surface
+## 8. Verify the surface
 
 After launch, walk the critical paths once:
 

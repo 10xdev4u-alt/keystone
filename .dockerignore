@@ -1,0 +1,11 @@
+# Keep the build context lean — the image only needs Rust sources + lockfile.
+target
+web
+docs
+scripts
+.github
+*.md
+.env
+.env.*
+!.env.example
+.git

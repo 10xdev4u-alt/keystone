@@ -83,6 +83,7 @@ impl S3Storage {
         let credentials =
             aws_sdk_s3::config::Credentials::new(access, secret, None, None, "static");
         let mut builder = aws_sdk_s3::config::Builder::new()
+            .behavior_version(aws_sdk_s3::config::BehaviorVersion::latest())
             .credentials_provider(credentials)
             .region(aws_sdk_s3::config::Region::new(region));
         if let Ok(endpoint) = std::env::var("AWS_ENDPOINT_URL_S3") {
