@@ -5839,7 +5839,7 @@
           "realtime"
         ],
         "summary": "`GET /api/v1/ws/chat/{conversation_id}`.",
-        "description": "Auth + membership are checked BEFORE the upgrade — a non-member never\nreaches the socket.\nUpgrade to the chat websocket for a conversation.",
+        "description": "Auth + membership are checked BEFORE the upgrade — a non-member never\nreaches the socket.\n\nBrowsers cannot set the `Authorization` header on a `WebSocket` upgrade,\nso the SPA authenticates via the `Sec-WebSocket-Protocol` subprotocol\n(`bearer.<jwt>`), which the server echoes back to complete the handshake.\nNative clients may keep using the standard Bearer header.",
         "operationId": "chat_socket",
         "parameters": [
           {
