@@ -1,5 +1,6 @@
 import { Link, Outlet, useNavigate } from "react-router-dom";
 import { useUnreadCount } from "../api/hooks";
+import { useNotificationStream } from "../lib/notificationStream";
 import { OfflineIndicator } from "../components/OfflineIndicator/OfflineIndicator";
 import { Avatar } from "../components/Avatar/Avatar";
 import { Button } from "../components/Button/Button";
@@ -14,6 +15,7 @@ import "./shell.css";
 export function AppLayout() {
   const navigate = useNavigate();
   const { data: unread } = useUnreadCount({ retry: false });
+  const { connected } = useNotificationStream();
   const nav = appNav.map((item) =>
     item.path === "/me/notifications" && unread?.unread
       ? { ...item, badge: unread.unread }
@@ -36,7 +38,14 @@ export function AppLayout() {
       </aside>
       <div className="shell__body">
         <header className="shell__topbar">
-          <div className="shell__topbar-title">Workspace</div>
+          <div className="shell__topbar-title">
+            Workspace
+            {connected && (
+              <span className="shell__live" title="Live notifications on">
+                ● live
+              </span>
+            )}
+          </div>
           <Avatar name="Current User" size="sm" />
         </header>
         <main className="shell__main">

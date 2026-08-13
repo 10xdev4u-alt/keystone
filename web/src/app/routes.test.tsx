@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
@@ -112,7 +113,15 @@ vi.mock("../api/hooks", () => ({
 
 function renderAt(path: string) {
   const router = createMemoryRouter(routesConfig, { initialEntries: [path] });
-  return render(<RouterProvider router={router} />);
+  // The real app always renders inside a QueryClientProvider (see main.tsx);
+  // AppLayout's live-notification hook needs the context even with the data
+  // hooks mocked.
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
 }
 
 describe("routing shells", () => {
