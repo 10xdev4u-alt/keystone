@@ -225,6 +225,15 @@
   z-index: 40;
 }
 
+.shell__live {
+  margin-left: 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-success, #15803d);
+}
+
 .shell__topbar-title {
   font-weight: var(--weight-semibold);
 }
