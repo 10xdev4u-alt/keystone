@@ -187,10 +187,43 @@ function SecurityTab() {
   );
 }
 
+type PrefsState = {
+  in_app: boolean;
+  digest: boolean;
+  email: boolean;
+  muted_kinds: string[];
+  quiet_hours_start: number | null;
+  quiet_hours_end: number | null;
+};
+
+/** Minutes since midnight (the API's quiet-hours unit) to "HH:MM". */
+function toTime(minutes: number): string {
+  const h = Math.floor(minutes / 60) % 24;
+  const m = minutes % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** "HH:MM" to minutes since midnight (the API's quiet-hours unit). */
+function toMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+const QUIET_DEFAULTS = { start: "22:00", end: "07:00" };
+
+/** Every kind the backend can emit, so users can mute by type. */
+const KIND_ROWS: Array<{ kind: string; label: string }> = [
+  { kind: "follow", label: "Follows" },
+  { kind: "comment", label: "Comments" },
+  { kind: "reaction", label: "Reactions" },
+  { kind: "answer", label: "Answers" },
+  { kind: "message", label: "Direct messages" },
+];
+
 function NotificationsTab() {
   const { data, isLoading, isError, error, refetch } = useNotificationPreferences();
   const update = useUpdateNotificationPreferences();
-  const [toggles, setToggles] = useState<{ in_app: boolean; digest: boolean; email: boolean } | null>(null);
+  const [draft, setDraft] = useState<PrefsState | null>(null);
 
   if (isLoading) return <Spinner label="Loading preferences" />;
   if (isError || !data) {
@@ -203,17 +236,43 @@ function NotificationsTab() {
     );
   }
 
-  const prefs = toggles ?? {
+  const prefs: PrefsState = draft ?? {
     in_app: data.preferences.in_app,
     digest: data.preferences.digest,
     email: data.preferences.email,
+    muted_kinds: data.preferences.muted_kinds,
+    quiet_hours_start: data.preferences.quiet_hours_start ?? null,
+    quiet_hours_end: data.preferences.quiet_hours_end ?? null,
   };
 
   function set(key: "in_app" | "digest" | "email", value: boolean) {
     const nextPrefs = { ...prefs, [key]: value };
-    setToggles(nextPrefs);
+    setDraft(nextPrefs);
     update.mutate(nextPrefs);
   }
+
+  function toggleMuted(kind: string, muted: boolean) {
+    const kinds = new Set(prefs.muted_kinds);
+    if (muted) kinds.add(kind);
+    else kinds.delete(kind);
+    const nextPrefs = { ...prefs, muted_kinds: [...kinds] };
+    setDraft(nextPrefs);
+    update.mutate(nextPrefs);
+  }
+
+  function setQuietHours(start: string | null, end: string | null) {
+    const nextPrefs: PrefsState = {
+      ...prefs,
+      quiet_hours_start: start === null ? null : toMinutes(start),
+      quiet_hours_end: end === null ? null : toMinutes(end),
+    };
+    setDraft(nextPrefs);
+    update.mutate(nextPrefs);
+  }
+
+  const quietEnabled = prefs.quiet_hours_start != null || prefs.quiet_hours_end != null;
+  const startTime = prefs.quiet_hours_start != null ? toTime(prefs.quiet_hours_start) : QUIET_DEFAULTS.start;
+  const endTime = prefs.quiet_hours_end != null ? toTime(prefs.quiet_hours_end) : QUIET_DEFAULTS.end;
 
   const rows: Array<{ key: "in_app" | "digest" | "email"; label: string; hint: string }> = [
     { key: "in_app", label: "In-app notifications", hint: "Banners and the notification bell." },
@@ -223,20 +282,79 @@ function NotificationsTab() {
 
   return (
     <div className="settings-notifications">
-      {rows.map((row) => (
-        <label key={row.key} className="settings-switch">
+      <section className="settings-section">
+        <h3>Delivery</h3>
+        {rows.map((row) => (
+          <label key={row.key} className="settings-switch">
+            <span>
+              <strong>{row.label}</strong>
+              <em>{row.hint}</em>
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              checked={prefs[row.key]}
+              onChange={(e) => set(row.key, e.target.checked)}
+            />
+          </label>
+        ))}
+      </section>
+
+      <section className="settings-section">
+        <h3>Quiet hours</h3>
+        <p className="settings-form__hint">Pause notifications every day during this window.</p>
+        <label className="settings-switch">
           <span>
-            <strong>{row.label}</strong>
-            <em>{row.hint}</em>
+            <strong>Enable quiet hours</strong>
+            <em>No banners, emails, or digests during quiet hours.</em>
           </span>
           <input
             type="checkbox"
             role="switch"
-            checked={prefs[row.key]}
-            onChange={(e) => set(row.key, e.target.checked)}
+            checked={quietEnabled}
+            onChange={(e) => {
+              if (e.target.checked) setQuietHours(QUIET_DEFAULTS.start, QUIET_DEFAULTS.end);
+              else setQuietHours(null, null);
+            }}
           />
         </label>
-      ))}
+        {quietEnabled && (
+          <div className="settings-quiet">
+            <label className="settings-field">
+              <span>Quiet from</span>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setQuietHours(e.target.value, endTime)}
+              />
+            </label>
+            <label className="settings-field">
+              <span>Until</span>
+              <input
+                type="time"
+                value={endTime}
+                onChange={(e) => setQuietHours(startTime, e.target.value)}
+              />
+            </label>
+          </div>
+        )}
+      </section>
+
+      <section className="settings-section">
+        <h3>Mute by type</h3>
+        <p className="settings-form__hint">Turn off notification kinds you don't care about.</p>
+        {KIND_ROWS.map((row) => (
+          <label key={row.kind} className="settings-check">
+            <input
+              type="checkbox"
+              checked={prefs.muted_kinds.includes(row.kind)}
+              onChange={(e) => toggleMuted(row.kind, e.target.checked)}
+            />
+            <span>{row.label}</span>
+          </label>
+        ))}
+      </section>
+
       {update.error && <p className="settings-form__error">{update.error.message}</p>}
     </div>
   );
