@@ -44,10 +44,11 @@ export function MessagesPage() {
     enabled: Boolean(me),
   });
   const { data: messages } = useMessages(activeId);
-  const { presence, typing } = useChatSocket(activeId);
+  const { presence, typing, sendFrame } = useChatSocket(activeId);
   const send = useSendMessage(activeId, {
     onSuccess: () => setDraft(""),
   });
+  const typingSentAt = useRef(0);
   const createConv = useCreateConversation({
     onSuccess: (data) => {
       setActiveId(data.conversation.id);
@@ -61,6 +62,24 @@ export function MessagesPage() {
   useEffect(() => {
     threadEndRef.current?.scrollIntoView({ block: "end" });
   }, [messages?.messages.length, activeId]);
+
+  // Mark the thread read when it opens or new messages arrive (the socket
+  // tells the other participant we're reading).
+  useEffect(() => {
+    if (activeId && (messages?.messages.length ?? 0) > 0) {
+      sendFrame({ type: "read" });
+    }
+  }, [activeId, messages?.messages.length, sendFrame]);
+
+  // Emit typing frames while drafting, throttled to one per 2s.
+  function onDraftChange(value: string) {
+    setDraft(value);
+    const now = Date.now();
+    if (value.trim() && now - typingSentAt.current > 2000) {
+      typingSentAt.current = now;
+      sendFrame({ type: "typing" });
+    }
+  }
 
   function onSend(e: FormEvent) {
     e.preventDefault();
@@ -220,7 +239,7 @@ export function MessagesPage() {
                   className="messages__input"
                   aria-label="Message"
                   value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
+                  onChange={(e) => onDraftChange(e.target.value)}
                   placeholder="Write a message…"
                   autoComplete="off"
                 />
