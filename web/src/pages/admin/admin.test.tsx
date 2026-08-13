@@ -36,8 +36,18 @@ const usersFixture = {
       last_login_at: null,
       created_at: new Date(Date.now() - 86_400_000).toISOString(),
     },
+    {
+      id: "33333333-3333-4333-8333-333333333333",
+      email: "member@example.com",
+      username: "member",
+      role: "user",
+      status: "active",
+      is_verified: false,
+      last_login_at: null,
+      created_at: new Date(Date.now() - 1_728_000_000).toISOString(),
+    },
   ],
-  limit: 50,
+  limit: 100,
   offset: 0,
 };
 
@@ -109,6 +119,28 @@ describe("AdminUsersPage", () => {
   it("renders the user directory with roles", () => {
     renderPage(<AdminUsersPage />);
     expect(screen.getByText("root@example.com")).toBeTruthy();
-    expect(screen.getByText("super_admin")).toBeTruthy();
+    expect(screen.getByText("super_admin", { selector: "span" })).toBeTruthy();
+    expect(screen.getByText("member@example.com")).toBeTruthy();
+  });
+
+  it("filters the directory by search query", async () => {
+    renderPage(<AdminUsersPage />);
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search users" }), "member");
+    expect(screen.getByText("member@example.com")).toBeTruthy();
+    expect(screen.queryByText("root@example.com")).toBeNull();
+    expect(screen.getByText("1 of 2 newest accounts.")).toBeTruthy();
+  });
+
+  it("filters the directory by role", async () => {
+    renderPage(<AdminUsersPage />);
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Filter by role" }), "user");
+    expect(screen.getByText("member@example.com")).toBeTruthy();
+    expect(screen.queryByText("root@example.com")).toBeNull();
+  });
+
+  it("shows an empty state when nothing matches", async () => {
+    renderPage(<AdminUsersPage />);
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search users" }), "zzz");
+    expect(screen.getByText("No users match this filter.")).toBeTruthy();
   });
 });
