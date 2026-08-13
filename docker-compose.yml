@@ -1,0 +1,89 @@
+# Local / single-host production stack: API + PostgreSQL + MinIO.
+#
+# Usage:
+#   docker compose up -d --build
+#   docker compose exec api curl -fsS localhost:4000/readyz
+#
+# First admin: register a user via the UI, then promote in SQL:
+#   docker compose exec db psql -U keystone -d keystone \
+#     -c "UPDATE users SET role='super_admin' WHERE email='you@example.com';"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: keystone
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-keystone}
+      POSTGRES_DB: keystone
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keystone -d keystone"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-keystone}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-keystone_dev}
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+
+  # One-time bucket creation; stays up as a sidecar that exits 0 after seeding.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $${MINIO_ROOT_USER:-keystone} $${MINIO_ROOT_PASSWORD:-keystone_dev} &&
+      mc mb --ignore-existing local/$${STORAGE_BUCKET:-keystone} &&
+      exit 0
+      "
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-keystone}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-keystone_dev}
+
+  api:
+    build: .
+    image: ghcr.io/10xdev4u-alt/keystone:latest
+    depends_on:
+      db:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4000
+      RUST_LOG: ${RUST_LOG:-info,keystone=debug}
+      DATABASE_URL: postgres://keystone:${POSTGRES_PASSWORD:-keystone}@db:5432/keystone
+      DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS:-10}
+      JWT_PRIVATE_KEY_B64: ${JWT_PRIVATE_KEY_B64:?set JWT_PRIVATE_KEY_B64 (openssl rand -base64 48)}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-s3}
+      AWS_ENDPOINT_URL_S3: http://minio:9000
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-keystone}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-keystone_dev}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-keystone}
+    ports:
+      - "${API_PORT:-4000}:4000"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  miniodata:
