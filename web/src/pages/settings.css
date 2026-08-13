@@ -150,3 +150,45 @@
   accent-color: var(--color-primary, #7b87f4);
   cursor: pointer;
 }
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.settings-section + .settings-section {
+  margin-top: 0.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.settings-section h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.settings-quiet {
+  display: flex;
+  gap: 1rem;
+}
+
+.settings-quiet .settings-field {
+  flex: 1;
+}
+
+.settings-check {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.settings-check input {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--color-primary, #7b87f4);
+  cursor: pointer;
+}

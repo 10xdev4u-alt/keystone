@@ -30,7 +30,14 @@ vi.mock("../api/hooks", () => ({
   useChangePassword: () => ({ mutate: changePasswordMutate, isPending: false, error: null }),
   useNotificationPreferences: () => ({
     data: {
-      preferences: { in_app: true, digest: false, email: true, muted_kinds: [] },
+      preferences: {
+        in_app: true,
+        digest: false,
+        email: true,
+        muted_kinds: [],
+        quiet_hours_start: null,
+        quiet_hours_end: null,
+      },
     },
     isLoading: false,
     isError: false,
@@ -123,6 +130,31 @@ describe("SettingsPage", () => {
       in_app: true,
       digest: true,
       email: true,
+      muted_kinds: [],
+      quiet_hours_start: null,
+      quiet_hours_end: null,
     });
+  });
+
+  it("enables quiet hours with sensible defaults", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole("tab", { name: "Notifications" }));
+    await user.click(screen.getByRole("switch", { name: /enable quiet hours/i }));
+    expect(screen.getByLabelText("Quiet from")).toHaveValue("22:00");
+    expect(screen.getByLabelText("Until")).toHaveValue("07:00");
+    expect(updatePrefsMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ quiet_hours_start: 1320, quiet_hours_end: 420 }),
+    );
+  });
+
+  it("mutes a notification kind", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole("tab", { name: "Notifications" }));
+    await user.click(screen.getByRole("checkbox", { name: "Direct messages" }));
+    expect(updatePrefsMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ muted_kinds: ["message"] }),
+    );
   });
 });
