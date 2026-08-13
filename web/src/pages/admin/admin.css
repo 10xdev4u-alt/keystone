@@ -154,6 +154,37 @@
 }
 
 /* ── Table (users) ───────────────────────────────────────────────────────── */
+.admin-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.admin-filters input[type="search"],
+.admin-filters select {
+  min-height: 2.4rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  color: var(--color-text, inherit);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.admin-filters input[type="search"] {
+  flex: 1;
+  min-width: 14rem;
+}
+
+.admin-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--color-text-muted, #667);
+  font-size: 0.9rem;
+}
+
 .admin-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--color-border, rgba(148, 163, 184, 0.2));
