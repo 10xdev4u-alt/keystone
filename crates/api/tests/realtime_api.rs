@@ -477,6 +477,100 @@ async fn unauthorized_ws_join_and_presence_rejected() {
 }
 
 #[tokio::test]
+async fn ws_browser_subprotocol_auth_and_typing() {
+    let Some((app, _pool)) = test_app().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
+        return;
+    };
+    let (alice, alice_id) = register_user(&app, "ws-sub-a@test.dev").await;
+    let (bob, bob_id) = register_user(&app, "ws-sub-b@test.dev").await;
+    let conv = direct_conversation(&app, &alice, bob_id).await;
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, app).await;
+    });
+
+    // Browsers cannot set the Authorization header on a WebSocket upgrade, so
+    // the SPA authenticates via the `bearer.<jwt>` subprotocol. The handshake
+    // must succeed and the server must echo the subprotocol back.
+    let connect_browser = |token: &str| {
+        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+        let mut request = format!("ws://127.0.0.1:{port}/api/v1/ws/chat/{conv}")
+            .into_client_request()
+            .unwrap();
+        request.headers_mut().insert(
+            axum::http::header::SEC_WEBSOCKET_PROTOCOL,
+            format!("bearer.{token}").parse().unwrap(),
+        );
+        request
+    };
+
+    let (mut alice_ws, alice_resp) = tokio_tungstenite::connect_async(connect_browser(&alice))
+        .await
+        .expect("subprotocol auth");
+    let echoed = alice_resp
+        .headers()
+        .get(axum::http::header::SEC_WEBSOCKET_PROTOCOL)
+        .and_then(|v| v.to_str().ok());
+    assert_eq!(echoed, Some(format!("bearer.{}", alice).as_str()));
+    let (mut bob_ws, _) = tokio_tungstenite::connect_async(connect_browser(&bob))
+        .await
+        .expect("second member joins via subprotocol");
+
+    // Ping-pong handshake: the socket handlers subscribe to the conversation
+    // channel only after the upgrade response, so prove both directions are
+    // live before asserting the payload. Bob's typing must reach Alice…
+    bob_ws
+        .send(tokio_tungstenite::tungstenite::Message::Text(
+            json!({ "type": "typing" }).to_string().into(),
+        ))
+        .await
+        .unwrap();
+    let mut alice_seen = false;
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !alice_seen && Instant::now() < deadline {
+        match tokio::time::timeout(Duration::from_secs(3), alice_ws.next()).await {
+            Ok(Some(Ok(tokio_tungstenite::tungstenite::Message::Text(text)))) => {
+                let value: Value = serde_json::from_str(&text).unwrap();
+                if value["type"] == "typing" {
+                    alice_seen = true;
+                }
+            }
+            _ => break,
+        }
+    }
+    assert!(alice_seen, "alice must receive bob's typing frame");
+
+    // …and Alice's typing must reach Bob (filtered by sender: Bob's rx also
+    // holds the echo of his own first frame).
+    alice_ws
+        .send(tokio_tungstenite::tungstenite::Message::Text(
+            json!({ "type": "typing" }).to_string().into(),
+        ))
+        .await
+        .unwrap();
+    let mut bob_seen = false;
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !bob_seen && Instant::now() < deadline {
+        match tokio::time::timeout(Duration::from_secs(3), bob_ws.next()).await {
+            Ok(Some(Ok(tokio_tungstenite::tungstenite::Message::Text(text)))) => {
+                let value: Value = serde_json::from_str(&text).unwrap();
+                if value["type"] == "typing" && value["payload"]["user_id"] == alice_id.to_string()
+                {
+                    bob_seen = true;
+                }
+            }
+            _ => break,
+        }
+    }
+    assert!(bob_seen, "bob must receive alice's typing frame");
+    let _ = alice_ws.close(None).await;
+    let _ = bob_ws.close(None).await;
+}
+
+#[tokio::test]
 async fn ws_chat_message_flow_presence_and_notification() {
     let Some((app, pool)) = test_app().await else {
         eprintln!("skipping: TEST_DATABASE_URL not set or unreachable");
